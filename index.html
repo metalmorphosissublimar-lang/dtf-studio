@@ -682,7 +682,63 @@ function showToast(msg,color){
   t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);
 }
 
-// ── AI BG Remove ──────────────────────────────────────────────────────────────
+// ── Copy main layer to sub-layer ──────────────────────────────────────────────
+function copyLayerToSub(slot){
+  const la=layers[slot*2];
+  if(!la.img){alert('La capa principal está vacía');return}
+  // Deep copy image to sub-layer
+  const ni=new Image();
+  ni.onload=()=>{
+    layers[slot*2+1].img=ni;
+    layers[slot*2+1].src=la.src;
+    layers[slot*2+1].rotate=la.rotate;
+    layers[slot*2+1].mirrorH=la.mirrorH;
+    layers[slot*2+1].mirrorV=la.mirrorV;
+    layers[slot*2+1].opacity=la.opacity;
+    renderSlotsBar();renderPreview();renderToolPanel();
+    showToast(`✅ Imagen ${slot+1} copiada a Sub-capa — ahora puedes quitar el fondo`,COLORS[slot]);
+  };
+  ni.src=la.src;
+}
+
+// ── Remove BG for specific layer independently ────────────────────────────────
+async function removeBgForLayer(layerIdx){
+  const l=layers[layerIdx];
+  if(!l.img){alert('Esta capa está vacía');return}
+  document.getElementById('ai-overlay').classList.add('show');
+  await new Promise(r=>setTimeout(r,80));
+  try{
+    const img=l.img,tmp=document.createElement('canvas');
+    tmp.width=img.naturalWidth;tmp.height=img.naturalHeight;
+    const ctx=tmp.getContext('2d');ctx.drawImage(img,0,0);
+    const id=ctx.getImageData(0,0,tmp.width,tmp.height),d=id.data,w=tmp.width,h=tmp.height;
+    const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1],[Math.floor(w/2),0],[0,Math.floor(h/2)],[w-1,Math.floor(h/2)],[Math.floor(w/2),h-1]];
+    let sr=0,sg=0,sb=0;
+    corners.forEach(([cx,cy])=>{const i=(cy*w+cx)*4;sr+=d[i];sg+=d[i+1];sb+=d[i+2]});
+    const bgR=sr/corners.length,bgG=sg/corners.length,bgB=sb/corners.length;
+    const tol=GA().bgTol+25;
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i],g=d[i+1],b=d[i+2];
+      const diff=Math.sqrt((r-bgR)**2+(g-bgG)**2+(b-bgB)**2);
+      if(diff<tol)d[i+3]=0;else if(diff<tol*1.6)d[i+3]=Math.round(255*(diff-tol)/(tol*.6));
+    }
+    ctx.putImageData(id,0,0);
+    const ni=new Image();
+    ni.onload=()=>{
+      layers[layerIdx].img=ni;
+      layers[layerIdx].src=ni.src;
+      addToHistory(ni.src,`BG quitado: ${layerName(layers[layerIdx])}`);
+      renderPreview();renderSlotsBar();renderToolPanel();
+      const slotNum=layers[layerIdx].imgSlot+1;
+      const isMain=layers[layerIdx].layerIdx===0;
+      showToast(`✅ Fondo eliminado en ${isMain?'Capa principal':'Sub-capa'} de Imagen ${slotNum}`,COLORS[layers[layerIdx].imgSlot]);
+    };
+    ni.src=tmp.toDataURL('image/png');
+  }catch(e){console.error(e)}
+  document.getElementById('ai-overlay').classList.remove('show');
+}
+
+// ── AI BG Remove (active layer) ───────────────────────────────────────────────
 async function removeBackgroundAI(){
   if(!AL().img){alert('Carga una imagen primero');return}
   document.getElementById('ai-overlay').classList.add('show');
@@ -778,33 +834,62 @@ function renderToolPanel(){
   }
 
   if(currentTab==='layers'){
-    const allLayers=layerOrder.map(i=>layers[i]);
-    h=`${SH('10 Capas Independientes','var(--accent)','2 por imagen')}
-    <div class="info-box blue"><div class="info-box-icon">◧</div><div>Cada imagen tiene <strong>Capa A</strong> y <strong>Capa B</strong> independientes. Combínalas con blend modes.</div></div>`;
-    // Group by image slot
+    h=`${SH('Capas por Imagen','var(--accent)','')}
+    <div class="info-box blue"><div class="info-box-icon">◧</div><div>
+      Cada imagen tiene una <strong>Capa principal</strong> y una <strong>Sub-capa</strong>.<br>
+      La sub-capa es una copia donde puedes quitar el fondo sin afectar la imagen original.
+    </div></div>`;
+
     for(let slot=0;slot<MAX_IMGS;slot++){
-      const la=layers[slot*2],lb=layers[slot*2+1];
-      h+=`<div style="background:rgba(14,20,30,.8);border:1px solid var(--border);border-radius:11px;padding:10px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
-        <div style="width:10px;height:10px;border-radius:50%;background:${COLORS[slot]}"></div>
-        <span style="font-size:11px;font-weight:700">IMG ${slot+1}</span>
-        <span style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace">${la.img||lb.img?'CON IMAGEN':'VACÍA'}</span>
-        <button class="btn sm" style="margin-left:auto;font-size:9px;padding:4px 8px" onclick="openPicker(${slot*2})">+ Capa A</button>
-        <button class="btn sm" style="font-size:9px;padding:4px 8px;border-color:rgba(${slot===1?'255,79,31':'0,200,255'},.3);color:${LAYER_COLORS[slot*2+1]}" onclick="openPicker(${slot*2+1})">+ Capa B</button>
-      </div>
-      ${[la,lb].map((l,li)=>`<div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;margin-bottom:${li===0?'5px':'0'};background:${l.id===activeLayer?`rgba(0,200,255,.08)`:'rgba(7,9,14,.5)'};border:1px solid ${l.id===activeLayer?`rgba(0,200,255,.3)`:'var(--border)'};cursor:pointer" onclick="activeLayer=${l.id};renderSlotsBar();renderPreview();renderToolPanel()">
-        <div style="width:8px;height:8px;border-radius:50%;background:${LAYER_COLORS[l.id]};flex-shrink:0"></div>
-        ${l.img?`<img src="${l.src}" style="width:28px;height:28px;object-fit:cover;border-radius:5px;flex-shrink:0">`:
-        `<div style="width:28px;height:28px;border-radius:5px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">+</div>`}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:10px;font-weight:700;color:${l.id===activeLayer?'var(--accent)':'var(--text)'}">Capa ${li===0?'A':'B'}</div>
-          <div style="font-size:8px;color:var(--muted);font-family:'IBM Plex Mono',monospace">${l.img?`${l.img.naturalWidth}×${l.img.naturalHeight}px · ${l.blend}`:'vacía'}</div>
+      const la=layers[slot*2];   // Capa principal
+      const lb=layers[slot*2+1]; // Sub-capa
+      const isActiveSlot=AL().imgSlot===slot;
+
+      h+=`<div style="background:rgba(14,20,30,.8);border:1.5px solid ${isActiveSlot?COLORS[slot]+'60':'var(--border)'};border-radius:13px;padding:11px;margin-bottom:10px;transition:all .2s">
+
+        <!-- Header de imagen -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="width:11px;height:11px;border-radius:50%;background:${COLORS[slot]};box-shadow:0 0 8px ${COLORS[slot]}66;flex-shrink:0"></div>
+          <span style="font-size:12px;font-weight:800;color:${isActiveSlot?COLORS[slot]:'var(--text)'}">Imagen ${slot+1}</span>
+          ${la.img?`<img src="${la.src}" style="width:26px;height:26px;object-fit:cover;border-radius:5px;margin-left:2px;border:1px solid var(--border)">`:
+          `<span style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace">vacía</span>`}
         </div>
-        <div style="display:flex;gap:4px">
-          <div onclick="event.stopPropagation();layers[${l.id}].visible=!layers[${l.id}].visible;renderPreview();renderToolPanel()" style="cursor:pointer;font-size:12px;opacity:${l.visible?1:.4}">${l.visible?'👁':'🚫'}</div>
-          ${l.img?`<div onclick="event.stopPropagation();layers[${l.id}].img=null;layers[${l.id}].src=null;renderSlotsBar();renderPreview();renderToolPanel()" style="cursor:pointer;font-size:11px;color:#ff6b6b">✕</div>`:''}
+
+        <!-- CAPA PRINCIPAL -->
+        <div style="border:1px solid ${la.id===activeLayer?COLORS[slot]+'70':'var(--border)'};border-radius:9px;padding:9px;margin-bottom:7px;background:${la.id===activeLayer?`rgba(${slot===0?'0,200,255':slot===1?'255,79,31':slot===2?'0,230,118':slot===3?'255,214,0':'168,85,247'},.07)`:'rgba(7,9,14,.5)'};cursor:pointer" onclick="activeLayer=${la.id};renderSlotsBar();renderPreview();renderToolPanel()">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:${la.img?'8px':'0'}">
+            <div style="background:${COLORS[slot]};color:#000;font-size:8px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;font-family:'IBM Plex Mono',monospace">CAPA</div>
+            ${la.img?
+              `<span style="font-size:10px;font-weight:700;color:${la.id===activeLayer?COLORS[slot]:'var(--text)'}">${la.img.naturalWidth}×${la.img.naturalHeight}px</span>
+               <div onclick="event.stopPropagation();layers[${la.id}].visible=!layers[${la.id}].visible;renderPreview();renderToolPanel()" style="cursor:pointer;font-size:13px;opacity:${la.visible?1:.35};margin-left:auto">${la.visible?'👁':'🚫'}</div>
+               <div onclick="event.stopPropagation();layers[${la.id}].img=null;layers[${la.id}].src=null;renderSlotsBar();renderPreview();renderToolPanel()" style="cursor:pointer;font-size:11px;color:#ff6b6b">✕</div>`:
+              `<button class="btn sm" style="padding:4px 10px;font-size:10px;margin-left:auto" onclick="event.stopPropagation();openPicker(${la.id})">+ Cargar imagen</button>`
+            }
+          </div>
+          ${la.img?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm" style="font-size:9px;padding:4px 9px;flex:1" onclick="event.stopPropagation();activeLayer=${la.id};renderToolPanel();copyLayerToSub(${slot})">📋 Copiar a Sub-capa</button>
+            <button class="btn sm purple" style="font-size:9px;padding:4px 9px;flex:1" onclick="event.stopPropagation();activeLayer=${la.id};removeBgForLayer(${la.id})">🧹 Quitar fondo</button>
+          </div>`:''}
         </div>
-      </div>`).join('')}
+
+        <!-- SUB-CAPA -->
+        <div style="border:1px solid ${lb.id===activeLayer?COLORS[slot]+'50':'rgba(255,255,255,.06)'};border-radius:9px;padding:9px;background:${lb.id===activeLayer?`rgba(${slot===0?'0,200,255':slot===1?'255,79,31':slot===2?'0,230,118':slot===3?'255,214,0':'168,85,247'},.05)`:'rgba(7,9,14,.3)'};cursor:pointer" onclick="activeLayer=${lb.id};renderSlotsBar();renderPreview();renderToolPanel()">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:${lb.img?'8px':'0'}">
+            <div style="background:transparent;border:1.5px dashed ${COLORS[slot]}80;color:${COLORS[slot]};font-size:8px;font-weight:800;padding:2px 5px;border-radius:5px;flex-shrink:0;font-family:'IBM Plex Mono',monospace">SUB</div>
+            ${lb.img?
+              `<span style="font-size:10px;font-weight:700;color:${lb.id===activeLayer?COLORS[slot]:'var(--muted)'}">${lb.img.naturalWidth}×${lb.img.naturalHeight}px</span>
+               <div onclick="event.stopPropagation();layers[${lb.id}].visible=!layers[${lb.id}].visible;renderPreview();renderToolPanel()" style="cursor:pointer;font-size:13px;opacity:${lb.visible?1:.35};margin-left:auto">${lb.visible?'👁':'🚫'}</div>
+               <div onclick="event.stopPropagation();layers[${lb.id}].img=null;layers[${lb.id}].src=null;renderSlotsBar();renderPreview();renderToolPanel()" style="cursor:pointer;font-size:11px;color:#ff6b6b">✕</div>`:
+              `<span style="font-size:9px;color:var(--muted)">vacía</span>
+               <button class="btn sm" style="padding:4px 10px;font-size:10px;margin-left:auto" onclick="event.stopPropagation();openPicker(${lb.id})">+ Cargar</button>`
+            }
+          </div>
+          ${lb.img?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn sm green" style="font-size:9px;padding:4px 9px;flex:1" onclick="event.stopPropagation();activeLayer=${lb.id};removeBgForLayer(${lb.id})">🤖 IA Quitar fondo</button>
+            <button class="btn sm" style="font-size:9px;padding:4px 9px;flex:1;border-color:rgba(255,80,80,.3);color:#ff6b6b" onclick="event.stopPropagation();layers[${lb.id}].img=null;layers[${lb.id}].src=null;renderSlotsBar();renderPreview();renderToolPanel()">🗑 Limpiar</button>
+          </div>`:`<div style="font-size:9px;color:var(--muted);margin-top:2px">Copia la capa principal aquí para probar sin fondo</div>`}
+        </div>
+
       </div>`;
     }
   }
