@@ -1,1059 +1,619 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <meta name="mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="DTF Studio"/>
-  <meta name="theme-color" content="#00C8FF"/>
-  <meta name="description" content="Editor de imágenes profesional para impresión DTF"/>
-  <title>DTF Studio Pro</title>
-  <link rel="manifest" href="manifest.json"/>
-  <!-- Apple touch icons -->
-  <link rel="apple-touch-icon" href="icon-192.png"/>
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
-
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-    :root {
-      --bg: #080B10; --panel: #0F1318; --card: #161B23; --border: #1E2530;
-      --accent: #00C8FF; --accent2: #FF4F1F; --green: #00E676;
-      --yellow: #FFD600; --purple: #A855F7; --text: #DDE3EE; --muted: #4A5568;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; overflow: hidden; background: var(--bg); }
-    body { font-family: 'Syne', sans-serif; color: var(--text); overscroll-behavior: none; }
-
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: var(--panel); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes slideUp { from { opacity:0; transform:translateY(40px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-    input[type=range] {
-      -webkit-appearance: none; width: 100%; height: 4px;
-      border-radius: 2px; background: var(--border); outline: none; cursor: pointer;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 18px; height: 18px;
-      border-radius: 50%; background: var(--accent); cursor: pointer;
-    }
-
-    /* ── Layout ── */
-    #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-
-    /* ── Header ── */
-    #header {
-      background: var(--panel); border-bottom: 1px solid var(--border);
-      padding: 0 16px; display: flex; align-items: center; gap: 10px;
-      height: 54px; flex-shrink: 0; position: relative; z-index: 10;
-    }
-    .logo-icon {
-      width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: flex; align-items: center; justify-content: center; font-size: 16px;
-    }
-    .logo-name { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
-    .logo-sub { font-size: 8px; color: var(--muted); letter-spacing: 0.12em; font-family: 'IBM Plex Mono', monospace; }
-    #open-btn {
-      margin-left: auto; background: linear-gradient(135deg,rgba(0,200,255,0.2),rgba(255,79,31,0.15));
-      border: 1px solid rgba(0,200,255,0.4); color: var(--accent);
-      border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 700;
-      cursor: pointer; font-family: 'Syne', sans-serif; display: flex; align-items: center; gap: 6px;
-    }
-
-    /* ── Image Slots ── */
-    #slots-bar {
-      background: var(--panel); border-bottom: 1px solid var(--border);
-      padding: 10px 12px; display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0;
-    }
-    .slot {
-      flex-shrink: 0; width: 62px; height: 62px; border-radius: 10px;
-      border: 2px solid var(--border); cursor: pointer; position: relative;
-      overflow: hidden; transition: all 0.2s; background: var(--card);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .slot.active { border-width: 2.5px; box-shadow: 0 0 12px rgba(0,200,255,0.3); }
-    .slot img { width: 100%; height: 100%; object-fit: cover; }
-    .slot-empty { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .slot-empty span { font-size: 20px; }
-    .slot-empty small { font-size: 8px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-weight: 600; letter-spacing: 0.08em; }
-    .slot-num {
-      position: absolute; top: 3px; left: 4px; font-size: 8px;
-      font-weight: 800; font-family: 'IBM Plex Mono', monospace;
-    }
-    .slot-del {
-      position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
-      background: rgba(0,0,0,0.7); border-radius: 50%; display: flex;
-      align-items: center; justify-content: center; font-size: 8px; color: #ff6b6b;
-      cursor: pointer; display: none;
-    }
-    .slot.has-img:hover .slot-del,
-    .slot.has-img:active .slot-del { display: flex; }
-
-    /* ── Main area ── */
-    #main { flex: 1; display: flex; overflow: hidden; }
-
-    /* ── Canvas area ── */
-    #canvas-area {
-      flex: 1; display: flex; flex-direction: column; overflow: hidden;
-    }
-    #canvas-toolbar {
-      background: var(--panel); border-bottom: 1px solid var(--border);
-      padding: 8px 12px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
-    }
-    .tool-btn {
-      background: var(--card); border: 1px solid var(--border); color: var(--muted);
-      border-radius: 6px; padding: 5px 9px; font-size: 11px; cursor: pointer;
-      font-family: 'IBM Plex Mono', monospace; transition: all 0.15s;
-    }
-    .tool-btn.on { background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.5); color: var(--accent); }
-    #canvas-wrap {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      overflow: auto; padding: 16px;
-      background: repeating-conic-gradient(#111 0% 25%, #0A0A0A 0% 50%) 0 0 / 16px 16px;
-    }
-    #preview { border-radius: 8px; box-shadow: 0 0 40px rgba(0,0,0,0.6); max-width: 100%; max-height: 100%; display: block; }
-    #empty-state {
-      text-align: center; cursor: pointer; padding: 44px 32px;
-      border: 2px dashed var(--border); border-radius: 16px; background: var(--card);
-      animation: fadeUp 0.4s ease;
-    }
-    #empty-state h2 { font-size: 17px; font-weight: 800; margin: 12px 0 6px; }
-    #empty-state p { font-size: 12px; color: var(--muted); }
-    .open-cta {
-      margin-top: 16px; display: inline-block; padding: 12px 24px;
-      background: linear-gradient(135deg,rgba(0,200,255,0.2),rgba(255,79,31,0.15));
-      border: 1px solid rgba(0,200,255,0.4); border-radius: 10px;
-      color: var(--accent); font-size: 13px; font-weight: 700; cursor: pointer;
-    }
-
-    /* ── Right panel ── */
-    #right-panel {
-      width: 250px; background: var(--panel); border-left: 1px solid var(--border);
-      display: flex; flex-direction: column; flex-shrink: 0;
-      transition: transform 0.3s ease;
-    }
-    @media (max-width: 600px) {
-      #right-panel {
-        position: fixed; right: 0; top: 0; bottom: 0; z-index: 50;
-        transform: translateX(100%); width: 80vw; max-width: 300px;
-        box-shadow: -8px 0 32px rgba(0,0,0,0.5);
-      }
-      #right-panel.open { transform: translateX(0); }
-      #panel-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 49; }
-      #panel-overlay.show { display: block; }
-      #toggle-panel-btn { display: flex !important; }
-    }
-    #toggle-panel-btn {
-      display: none; background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); border-radius: 6px; padding: 5px 9px;
-      font-size: 14px; cursor: pointer; margin-left: auto;
-    }
-
-    .tabs { display: flex; border-bottom: 1px solid var(--border); }
-    .tab {
-      flex: 1; padding: 11px 2px; font-size: 15px; cursor: pointer;
-      background: transparent; border: none; border-bottom: 2px solid transparent;
-      color: var(--muted); transition: all 0.15s;
-    }
-    .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
-
-    #tool-body { flex: 1; overflow-y: auto; padding: 14px; }
-
-    .sh {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 8px; margin-top: 2px;
-      font-family: 'IBM Plex Mono', monospace;
-      border-left: 2px solid var(--accent); padding-left: 7px;
-    }
-
-    .slider-row { margin-bottom: 11px; }
-    .slider-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 11px; }
-    .slider-val { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); }
-
-    .tog-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
-    .tog-row span { font-size: 11px; color: var(--text); }
-    .tog {
-      width: 38px; height: 22px; border-radius: 11px; background: var(--border);
-      cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
-    }
-    .tog.on { background: var(--accent); }
-    .tog::after {
-      content: ''; position: absolute; top: 3px; left: 3px;
-      width: 16px; height: 16px; border-radius: 50%; background: #fff;
-      transition: left 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-    }
-    .tog.on::after { left: 19px; }
-
-    .btn {
-      background: rgba(0,200,255,0.15); border: 1px solid rgba(0,200,255,0.4);
-      color: var(--accent); border-radius: 7px; padding: 8px 12px;
-      font-size: 11px; font-weight: 700; cursor: pointer;
-      font-family: 'Syne', sans-serif; transition: all 0.15s;
-      letter-spacing: 0.04em;
-    }
-    .btn:hover:not(:disabled) { filter: brightness(1.2); transform: translateY(-1px); }
-    .btn:disabled { background: var(--border); border-color: var(--border); color: var(--muted); cursor: not-allowed; }
-    .btn.full { width: 100%; }
-    .btn.green { background: rgba(0,230,118,0.15); border-color: rgba(0,230,118,0.4); color: var(--green); }
-    .btn.red { background: rgba(255,80,80,0.15); border-color: rgba(255,80,80,0.4); color: #ff6b6b; }
-    .btn.muted { background: rgba(90,100,120,0.15); border-color: rgba(90,100,120,0.3); color: var(--muted); }
-
-    .rot-btns { display: flex; gap: 5px; margin-bottom: 11px; }
-    .rot-btn {
-      flex: 1; padding: 6px 0; background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); border-radius: 5px; font-size: 10px; cursor: pointer;
-      font-family: 'IBM Plex Mono', monospace; transition: all 0.15s;
-    }
-    .rot-btn.on { background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.5); color: var(--accent); }
-
-    .fmt-btns { display: flex; gap: 5px; margin-bottom: 10px; }
-    .fmt-btn {
-      flex: 1; padding: 7px 0; background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); border-radius: 5px; font-size: 11px; cursor: pointer;
-      font-family: 'IBM Plex Mono', monospace; font-weight: 700; text-transform: uppercase;
-      transition: all 0.15s;
-    }
-    .fmt-btn.on { background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.5); color: var(--accent); }
-
-    .preset-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .preset-btn {
-      padding: 7px 10px; background: var(--card); border: 1px solid var(--border);
-      color: var(--text); border-radius: 6px; font-size: 11px; cursor: pointer;
-      text-align: left; font-family: 'Syne', sans-serif; display: flex;
-      justify-content: space-between; align-items: center; transition: all 0.15s;
-    }
-    .preset-btn.on { background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.5); color: var(--accent); }
-    .preset-btn small { font-size: 8px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); }
-
-    .info-box {
-      border-radius: 8px; padding: 8px 10px; font-size: 10px;
-      color: var(--muted); line-height: 1.7; margin-bottom: 10px;
-    }
-    .info-box.green { background: rgba(0,230,118,0.07); border: 1px solid rgba(0,230,118,0.25); color: var(--green); }
-    .info-box.blue { background: rgba(0,200,255,0.07); border: 1px solid rgba(0,200,255,0.25); }
-    .info-box.yellow { background: rgba(255,214,0,0.07); border: 1px solid rgba(255,214,0,0.25); }
-
-    .output-card {
-      margin-top: 12px; background: rgba(0,230,118,0.07);
-      border: 1px solid rgba(0,230,118,0.3); border-radius: 10px; padding: 12px;
-      animation: fadeUp 0.4s ease;
-    }
-    .output-card h4 { font-size: 11px; color: var(--green); font-weight: 700; margin-bottom: 6px; }
-    .output-card code { font-size: 9px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; display: block; line-height: 1.8; }
-    .dl-btn {
-      display: block; margin-top: 10px; background: var(--green); color: #000;
-      border-radius: 7px; padding: 10px; text-align: center; font-size: 12px;
-      font-weight: 800; text-decoration: none; font-family: 'Syne', sans-serif;
-      letter-spacing: 0.05em;
-    }
-
-    textarea.text-input {
-      width: 100%; background: var(--card); border: 1px solid var(--border);
-      color: var(--text); border-radius: 7px; padding: 8px 10px;
-      font-size: 12px; font-family: 'Syne', sans-serif; resize: vertical;
-      min-height: 55px; margin-bottom: 10px; outline: none;
-    }
-    .row2 { display: flex; gap: 6px; margin-bottom: 10px; align-items: flex-end; }
-    select.sel {
-      background: var(--card); border: 1px solid var(--border); color: var(--text);
-      border-radius: 6px; padding: 7px 8px; font-size: 11px; font-family: 'Syne', sans-serif;
-      width: 100%;
-    }
-    input[type=color].col-pick {
-      width: 36px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
-      cursor: pointer; padding: 2px; background: none; flex-shrink: 0;
-    }
-    .text-item {
-      display: flex; align-items: center; gap: 8px; padding: 7px 9px;
-      border-radius: 7px; margin-bottom: 4px; cursor: pointer;
-      border: 1px solid var(--border); background: var(--card); transition: all 0.15s;
-    }
-    .text-item.active { border-color: rgba(0,200,255,0.5); background: rgba(0,200,255,0.1); }
-    .text-item-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--border); }
-
-    .ht-shapes { display: flex; gap: 5px; margin-bottom: 10px; }
-    .ht-shape {
-      flex: 1; padding: 7px 3px; background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); border-radius: 5px; font-size: 9px; cursor: pointer;
-      font-family: 'IBM Plex Mono', monospace; text-align: center; transition: all 0.15s;
-    }
-    .ht-shape.on { background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.5); color: var(--accent); }
-
-    .ht-colors { display: flex; gap: 7px; align-items: center; margin-bottom: 10px; }
-    .ht-col {
-      width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-      transition: transform 0.15s; border: 2px solid var(--border);
-    }
-    .ht-col.on { transform: scale(1.25); border-color: var(--accent); }
-
-    .bg-targets { display: flex; gap: 5px; margin-bottom: 10px; }
-    .bg-target {
-      flex: 1; padding: 7px 3px; background: var(--card); border: 1px solid var(--border);
-      color: var(--muted); border-radius: 5px; font-size: 9px; cursor: pointer;
-      font-family: 'Syne', sans-serif; text-align: center; transition: all 0.15s;
-    }
-    .bg-target.on { background: rgba(0,230,118,0.15); border-color: rgba(0,230,118,0.5); color: var(--green); }
-
-    /* ── Media Picker Modal ── */
-    #picker-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88);
-      z-index: 200; align-items: flex-end; justify-content: center; backdrop-filter: blur(8px);
-    }
-    #picker-modal.show { display: flex; }
-    .picker-sheet {
-      background: var(--panel); border-radius: 22px 22px 0 0; padding: 24px 20px 40px;
-      width: 100%; max-width: 460px; border-top: 1px solid var(--border);
-      animation: slideUp 0.3s ease;
-    }
-    .picker-handle { width: 38px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 20px; }
-    .picker-source {
-      background: transparent; border: 1px solid rgba(0,200,255,0.4);
-      border-radius: 14px; padding: 16px 16px; cursor: pointer; display: flex;
-      align-items: center; gap: 14px; margin-bottom: 10px; width: 100%;
-      font-family: 'Syne', sans-serif; transition: all 0.2s;
-    }
-    .picker-source:active { opacity: 0.8; }
-    .picker-source-icon {
-      width: 48px; height: 48px; border-radius: 12px; display: flex;
-      align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
-    }
-    .picker-source-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
-    .picker-source-sub { font-size: 10px; color: var(--muted); }
-    .picker-cancel {
-      display: block; width: 100%; margin-top: 14px; background: transparent;
-      border: 1px solid var(--border); color: var(--muted); border-radius: 8px;
-      padding: 12px; font-size: 12px; cursor: pointer; font-family: 'Syne', sans-serif;
-    }
-
-    /* ── Install Banner ── */
-    #install-banner {
-      display: none; position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      background: var(--panel); border: 1px solid rgba(0,200,255,0.4);
-      border-radius: 16px; padding: 14px 18px; width: calc(100% - 32px); max-width: 380px;
-      z-index: 100; animation: slideUp 0.4s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    }
-    #install-banner.show { display: flex; align-items: center; gap: 12px; }
-    .install-icon { font-size: 28px; flex-shrink: 0; }
-    .install-text { flex: 1; }
-    .install-text h4 { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
-    .install-text p { font-size: 10px; color: var(--muted); line-height: 1.5; }
-    #install-btn {
-      background: var(--accent); color: #000; border: none; border-radius: 9px;
-      padding: 9px 14px; font-size: 12px; font-weight: 800; cursor: pointer;
-      font-family: 'Syne', sans-serif; flex-shrink: 0; white-space: nowrap;
-    }
-    #install-close {
-      position: absolute; top: 10px; right: 12px; background: none; border: none;
-      color: var(--muted); font-size: 16px; cursor: pointer;
-    }
-
-    /* iOS install hint */
-    #ios-hint {
-      display: none; position: fixed; bottom: 0; left: 0; right: 0;
-      background: var(--panel); border-top: 1px solid var(--border);
-      padding: 16px 20px 32px; z-index: 100; animation: slideUp 0.3s ease;
-      text-align: center;
-    }
-    #ios-hint.show { display: block; }
-    #ios-hint h4 { font-size: 14px; font-weight: 800; margin-bottom: 8px; }
-    #ios-hint p { font-size: 12px; color: var(--muted); line-height: 1.8; }
-    #ios-hint strong { color: var(--text); }
-    #ios-close { margin-top: 14px; }
-
-    /* Spinning loader */
-    .spin { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="DTF Studio"/>
+<meta name="theme-color" content="#00C8FF"/>
+<title>DTF Studio Pro</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{--bg:#080B10;--panel:#0F1318;--card:#161B23;--border:#1E2530;--accent:#00C8FF;--accent2:#FF4F1F;--green:#00E676;--yellow:#FFD600;--purple:#A855F7;--text:#DDE3EE;--muted:#4A5568}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'Syne',sans-serif;color:var(--text);overscroll-behavior:none}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--panel)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--accent);cursor:pointer}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;gap:10px;height:52px;flex-shrink:0;z-index:10}
+.logo-icon{width:32px;height:32px;flex-shrink:0;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo-name{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.logo-sub{font-size:8px;color:var(--muted);letter-spacing:.1em;font-family:'IBM Plex Mono',monospace}
+#open-btn{margin-left:auto;background:linear-gradient(135deg,rgba(0,200,255,.2),rgba(255,79,31,.15));border:1px solid rgba(0,200,255,.4);color:var(--accent);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;display:flex;align-items:center;gap:5px}
+#toggle-panel-btn{display:none;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 9px;font-size:14px;cursor:pointer;margin-left:6px}
+#slots-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 10px;display:flex;gap:7px;overflow-x:auto;flex-shrink:0}
+.slot{flex-shrink:0;width:58px;height:58px;border-radius:10px;border:2px solid var(--border);cursor:pointer;position:relative;overflow:hidden;transition:all .2s;background:var(--card);display:flex;align-items:center;justify-content:center}
+.slot img{width:100%;height:100%;object-fit:cover}
+.slot-empty{display:flex;flex-direction:column;align-items:center;gap:2px}
+.slot-empty span{font-size:18px}
+.slot-empty small{font-size:8px;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-weight:600}
+.slot-num{position:absolute;top:2px;left:3px;font-size:8px;font-weight:800;font-family:'IBM Plex Mono',monospace}
+.slot-del{position:absolute;top:2px;right:2px;width:15px;height:15px;background:rgba(0,0,0,.75);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ff6b6b;cursor:pointer}
+#main{flex:1;display:flex;overflow:hidden}
+#canvas-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#canvas-toolbar{background:var(--panel);border-bottom:1px solid var(--border);padding:7px 10px;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.tool-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px 9px;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .15s;white-space:nowrap}
+.tool-btn.on{background:rgba(0,200,255,.15);border-color:rgba(0,200,255,.5);color:var(--accent)}
+#canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:14px;background:repeating-conic-gradient(#111 0% 25%,#0A0A0A 0% 50%) 0 0/16px 16px;position:relative}
+#preview{border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.6);max-width:100%;max-height:100%;display:block;touch-action:none}
+#empty-state{text-align:center;cursor:pointer;padding:40px 28px;border:2px dashed var(--border);border-radius:16px;background:var(--card);animation:fadeUp .4s ease;max-width:300px}
+#empty-state h2{font-size:16px;font-weight:800;margin:10px 0 5px}
+#empty-state p{font-size:11px;color:var(--muted)}
+.open-cta{margin-top:14px;display:inline-block;padding:11px 22px;background:linear-gradient(135deg,rgba(0,200,255,.2),rgba(255,79,31,.15));border:1px solid rgba(0,200,255,.4);border-radius:10px;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer}
+#right-panel{width:245px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:transform .3s ease}
+@media(max-width:640px){
+  #right-panel{position:fixed;right:0;top:0;bottom:0;z-index:50;transform:translateX(100%);width:82vw;max-width:290px;box-shadow:-8px 0 32px rgba(0,0,0,.5)}
+  #right-panel.open{transform:translateX(0)}
+  #panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49}
+  #panel-overlay.show{display:block}
+  #toggle-panel-btn{display:flex!important}
+}
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{flex-shrink:0;padding:10px 8px;font-size:13px;cursor:pointer;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);transition:all .15s}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+#tool-body{flex:1;overflow-y:auto;padding:13px}
+.sh{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;margin-top:2px;font-family:'IBM Plex Mono',monospace;border-left:2px solid var(--accent);padding-left:7px}
+.slider-row{margin-bottom:11px}
+.slider-label{display:flex;justify-content:space-between;margin-bottom:5px;font-size:11px}
+.slider-val{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent)}
+.tog-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.tog-row span{font-size:11px;color:var(--text)}
+.tog{width:40px;height:22px;border-radius:11px;background:var(--border);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.tog.on{background:var(--accent)}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.tog.on::after{left:21px}
+.btn{background:rgba(0,200,255,.15);border:1px solid rgba(0,200,255,.4);color:var(--accent);border-radius:7px;padding:9px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;transition:all .15s;letter-spacing:.04em}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:disabled{background:var(--border);border-color:var(--border);color:var(--muted);cursor:not-allowed}
+.btn.full{width:100%}
+.btn.green{background:rgba(0,230,118,.15);border-color:rgba(0,230,118,.4);color:var(--green)}
+.btn.red{background:rgba(255,80,80,.15);border-color:rgba(255,80,80,.4);color:#ff6b6b}
+.btn.muted{background:rgba(90,100,120,.15);border-color:rgba(90,100,120,.3);color:var(--muted)}
+.btn.purple{background:rgba(168,85,247,.15);border-color:rgba(168,85,247,.4);color:var(--purple)}
+.btn.yellow{background:rgba(255,214,0,.15);border-color:rgba(255,214,0,.4);color:var(--yellow)}
+.rot-btns,.fmt-btns,.shape-btns{display:flex;gap:5px;margin-bottom:11px}
+.rot-btn,.fmt-btn,.shape-btn{flex:1;padding:7px 0;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:5px;font-size:9px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-weight:700;text-align:center;transition:all .15s}
+.rot-btn.on,.fmt-btn.on,.shape-btn.on{background:rgba(0,200,255,.15);border-color:rgba(0,200,255,.5);color:var(--accent)}
+.preset-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.preset-btn{padding:7px 10px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:11px;cursor:pointer;text-align:left;font-family:'Syne',sans-serif;display:flex;justify-content:space-between;align-items:center;transition:all .15s}
+.preset-btn.on{background:rgba(0,200,255,.15);border-color:rgba(0,200,255,.5);color:var(--accent)}
+.preset-btn small{font-size:8px;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
+.info-box{border-radius:8px;padding:8px 10px;font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px}
+.info-box.green{background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.25);color:var(--green)}
+.info-box.blue{background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.25)}
+.info-box.yellow{background:rgba(255,214,0,.07);border:1px solid rgba(255,214,0,.25)}
+.output-card{margin-top:12px;background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.3);border-radius:10px;padding:12px;animation:fadeUp .4s ease}
+.output-card h4{font-size:11px;color:var(--green);font-weight:700;margin-bottom:6px}
+.output-card code{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:block;line-height:1.8}
+.dl-btn{display:block;margin-top:10px;background:var(--green);color:#000;border-radius:7px;padding:10px;text-align:center;font-size:12px;font-weight:800;text-decoration:none;font-family:'Syne',sans-serif;letter-spacing:.05em}
+textarea.text-input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;font-family:'Syne',sans-serif;resize:vertical;min-height:52px;margin-bottom:9px;outline:none}
+.row2{display:flex;gap:6px;margin-bottom:9px;align-items:flex-end}
+select.sel{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-size:11px;font-family:'Syne',sans-serif;width:100%}
+input[type=color].col-pick{width:36px;height:32px;border-radius:6px;border:1px solid var(--border);cursor:pointer;padding:2px;background:none;flex-shrink:0}
+input.num-input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 8px;font-size:11px;font-family:'IBM Plex Mono',monospace;width:100%}
+.text-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;margin-bottom:4px;cursor:pointer;border:1px solid var(--border);background:var(--card);transition:all .15s}
+.text-item.active{border-color:rgba(0,200,255,.5);background:rgba(0,200,255,.1)}
+.text-item-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1px solid var(--border)}
+.ht-colors{display:flex;gap:7px;align-items:center;margin-bottom:10px}
+.ht-col{width:22px;height:22px;border-radius:50%;cursor:pointer;transition:transform .15s;border:2px solid var(--border)}
+.ht-col.on{transform:scale(1.3);border-color:var(--accent)}
+.bg-targets{display:flex;gap:5px;margin-bottom:10px}
+.bg-target{flex:1;padding:7px 3px;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:5px;font-size:9px;cursor:pointer;font-family:'Syne',sans-serif;text-align:center;transition:all .15s}
+.bg-target.on{background:rgba(0,230,118,.15);border-color:rgba(0,230,118,.5);color:var(--green)}
+.hist-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;margin-bottom:5px;border:1px solid var(--border);background:var(--card);cursor:pointer}
+.hist-thumb{width:36px;height:36px;border-radius:5px;object-fit:cover;flex-shrink:0}
+.hist-info div{font-size:10px;font-weight:700}
+.hist-info small{font-size:8px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+#picker-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}
+#picker-modal.show{display:flex}
+.picker-sheet{background:var(--panel);border-radius:22px 22px 0 0;padding:22px 18px 36px;width:100%;max-width:460px;border-top:1px solid var(--border);animation:slideUp .3s ease}
+.picker-handle{width:38px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 18px}
+.picker-source{background:transparent;border:1px solid rgba(0,200,255,.4);border-radius:14px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:13px;margin-bottom:9px;width:100%;font-family:'Syne',sans-serif}
+.picker-source-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.picker-source-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.picker-source-sub{font-size:10px;color:var(--muted)}
+.picker-cancel{display:block;width:100%;margin-top:12px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif}
+#resize-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(8px);padding:16px}
+#resize-modal.show{display:flex}
+.modal-card{background:var(--panel);border-radius:18px;padding:22px;width:100%;max-width:340px;border:1px solid var(--border);animation:fadeUp .3s ease}
+.modal-card h3{font-size:16px;font-weight:800;margin-bottom:16px}
+#install-banner{display:none;position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid rgba(0,200,255,.4);border-radius:16px;padding:12px 16px;width:calc(100% - 28px);max-width:380px;z-index:100;animation:slideUp .4s ease;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#install-banner.show{display:flex;align-items:center;gap:11px}
+.install-text h4{font-size:12px;font-weight:800;margin-bottom:2px}
+.install-text p{font-size:10px;color:var(--muted)}
+#install-btn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:8px 13px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Syne',sans-serif;flex-shrink:0}
+#install-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer}
+.spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}
+#ai-overlay{display:none;position:absolute;inset:0;background:rgba(8,11,16,.85);align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:20;border-radius:8px}
+#ai-overlay.show{display:flex}
+#ai-overlay p{font-size:12px;color:var(--accent);font-family:'IBM Plex Mono',monospace}
+.big-spin{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+</style>
 </head>
 <body>
-
 <div id="app">
-  <!-- Header -->
-  <div id="header">
-    <div class="logo-icon">🎨</div>
-    <div>
-      <div class="logo-name">DTF Studio Pro</div>
-      <div class="logo-sub">EDITOR · SEMITONO · DTF EXPORT</div>
+<div id="header">
+  <div class="logo-icon">🎨</div>
+  <div><div class="logo-name">DTF Studio Pro</div><div class="logo-sub">EDITOR · IA · SEMITONO · DTF</div></div>
+  <button id="open-btn" onclick="openPicker(-1)">📁 Abrir</button>
+  <button id="toggle-panel-btn" onclick="togglePanel()">🎛</button>
+</div>
+<div id="slots-bar"></div>
+<div id="main">
+  <div id="canvas-area">
+    <div id="canvas-toolbar">
+      <button class="tool-btn" onclick="rotateSlot(-90)">↺-90</button>
+      <button class="tool-btn" onclick="rotateSlot(90)">↻+90</button>
+      <button class="tool-btn" id="mh-btn" onclick="toggleMirror('H')">↔H</button>
+      <button class="tool-btn" id="mv-btn" onclick="toggleMirror('V')">↕V</button>
+      <button class="tool-btn" id="crop-btn" onclick="toggleCrop()">✂ Crop</button>
+      <button class="tool-btn" id="apply-crop-btn" onclick="applyCrop()" style="display:none;border-color:rgba(0,230,118,.5);color:var(--green)">✓ Ok</button>
+      <button class="tool-btn" onclick="showResizeModal()" style="border-color:rgba(255,214,0,.4);color:var(--yellow)">⊞ Resize</button>
     </div>
-    <button id="open-btn" onclick="openPicker(-1)">📁 Abrir</button>
-    <button id="toggle-panel-btn" onclick="togglePanel()">🎛</button>
+    <div id="canvas-wrap">
+      <div id="empty-state" onclick="openPicker(-1)">
+        <div style="font-size:44px">🖼️</div>
+        <h2>Carga hasta 5 imágenes</h2>
+        <p>Toca para seleccionar desde tu galería o cámara</p>
+        <div class="open-cta">📷 Galería / Cámara</div>
+      </div>
+      <canvas id="preview" style="display:none"></canvas>
+      <div id="ai-overlay"><div class="big-spin"></div><p>IA eliminando fondo...</p></div>
+    </div>
   </div>
-
-  <!-- Image Slots -->
-  <div id="slots-bar">
-    <!-- Filled by JS -->
-  </div>
-
-  <!-- Main -->
-  <div id="main">
-    <!-- Canvas Area -->
-    <div id="canvas-area">
-      <div id="canvas-toolbar">
-        <button class="tool-btn" onclick="rotateSlot(-90)">↺ −90°</button>
-        <button class="tool-btn" onclick="rotateSlot(90)">↻ +90°</button>
-        <button class="tool-btn" id="mh-btn" onclick="toggleMirror('H')">↔ H</button>
-        <button class="tool-btn" id="mv-btn" onclick="toggleMirror('V')">↕ V</button>
-        <button class="tool-btn" id="crop-btn" onclick="toggleCrop()">✂ Crop</button>
-        <button class="tool-btn" id="apply-crop-btn" onclick="applyCrop()" style="display:none;border-color:rgba(0,230,118,0.5);color:var(--green)">✓ Aplicar</button>
-      </div>
-      <div id="canvas-wrap">
-        <div id="empty-state" onclick="openPicker(-1)">
-          <div style="font-size:48px">🖼️</div>
-          <h2>Carga hasta 5 imágenes</h2>
-          <p>Toca para seleccionar desde tu galería o cámara</p>
-          <div class="open-cta">📷 Galería / Cámara</div>
-        </div>
-        <canvas id="preview" style="display:none"></canvas>
-      </div>
+  <div id="panel-overlay" onclick="togglePanel()"></div>
+  <div id="right-panel">
+    <div class="tabs">
+      <button class="tab on" onclick="switchTab('adjust')" id="tab-adjust">🎛</button>
+      <button class="tab" onclick="switchTab('crop')" id="tab-crop">✂️</button>
+      <button class="tab" onclick="switchTab('text')" id="tab-text">✏️</button>
+      <button class="tab" onclick="switchTab('halftone')" id="tab-halftone">⚪</button>
+      <button class="tab" onclick="switchTab('bg')" id="tab-bg">🧹</button>
+      <button class="tab" onclick="switchTab('watermark')" id="tab-watermark">💧</button>
+      <button class="tab" onclick="switchTab('export')" id="tab-export">📤</button>
+      <button class="tab" onclick="switchTab('history')" id="tab-history">🕐</button>
     </div>
-
-    <!-- Right Panel -->
-    <div id="panel-overlay" onclick="togglePanel()"></div>
-    <div id="right-panel">
-      <div class="tabs">
-        <button class="tab on" onclick="switchTab('adjust')" id="tab-adjust" title="Ajustes">🎛</button>
-        <button class="tab" onclick="switchTab('crop')" id="tab-crop" title="Recorte">✂️</button>
-        <button class="tab" onclick="switchTab('text')" id="tab-text" title="Texto">✏️</button>
-        <button class="tab" onclick="switchTab('halftone')" id="tab-halftone" title="Semitono">⚪</button>
-        <button class="tab" onclick="switchTab('bg')" id="tab-bg" title="Fondo">🧹</button>
-        <button class="tab" onclick="switchTab('export')" id="tab-export" title="Exportar">📤</button>
-      </div>
-      <div id="tool-body"></div>
-    </div>
+    <div id="tool-body"></div>
   </div>
 </div>
+</div>
 
-<!-- Media Picker Modal -->
 <div id="picker-modal">
   <div class="picker-sheet">
     <div class="picker-handle"></div>
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:32px;margin-bottom:8px">📸</div>
-      <div style="font-size:16px;font-weight:800;margin-bottom:4px">Seleccionar Imagen</div>
-      <div style="font-size:11px;color:var(--muted)" id="picker-slot-label">Elige la fuente</div>
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:30px;margin-bottom:8px">📸</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:3px">Seleccionar Imagen</div>
+      <div style="font-size:10px;color:var(--muted)" id="picker-slot-label">Elige la fuente</div>
     </div>
-    <button class="picker-source" onclick="triggerGallery()" style="background:rgba(0,200,255,0.08)">
-      <div class="picker-source-icon" style="background:rgba(0,200,255,0.15)">🖼️</div>
-      <div>
-        <div class="picker-source-title">Galería / Archivos</div>
-        <div class="picker-source-sub">Selecciona desde tus fotos · JPG · PNG · WEBP · GIF</div>
-      </div>
+    <button class="picker-source" onclick="triggerGallery()" style="background:rgba(0,200,255,.08)">
+      <div class="picker-source-icon" style="background:rgba(0,200,255,.15)">🖼️</div>
+      <div><div class="picker-source-title">Galería / Archivos</div><div class="picker-source-sub">JPG · PNG · WEBP · GIF</div></div>
       <span style="margin-left:auto;color:var(--accent);font-size:18px">›</span>
     </button>
-    <button class="picker-source" onclick="triggerCamera()" style="background:rgba(255,79,31,0.08);border-color:rgba(255,79,31,0.4)">
-      <div class="picker-source-icon" style="background:rgba(255,79,31,0.15)">📷</div>
-      <div>
-        <div class="picker-source-title">Cámara</div>
-        <div class="picker-source-sub">Toma una foto ahora · Requiere permiso de cámara</div>
-      </div>
+    <button class="picker-source" onclick="triggerCamera()" style="background:rgba(255,79,31,.08);border-color:rgba(255,79,31,.4)">
+      <div class="picker-source-icon" style="background:rgba(255,79,31,.15)">📷</div>
+      <div><div class="picker-source-title">Cámara</div><div class="picker-source-sub">Tomar foto ahora</div></div>
       <span style="margin-left:auto;color:var(--accent2);font-size:18px">›</span>
     </button>
-    <div class="info-box yellow" style="margin-top:12px">
-      🔒 Solo accedemos a las imágenes que tú selecciones. Tu privacidad está protegida.
-    </div>
+    <div class="info-box yellow" style="margin-top:10px">🔒 Solo accedemos a las imágenes que tú selecciones.</div>
     <button class="picker-cancel" onclick="closePicker()">Cancelar</button>
     <input id="file-gallery" type="file" accept="image/*" multiple style="display:none" onchange="onFilePicked(event)"/>
     <input id="file-camera" type="file" accept="image/*" capture="environment" style="display:none" onchange="onFilePicked(event)"/>
   </div>
 </div>
 
-<!-- Install Banner (Android/Chrome) -->
-<div id="install-banner">
-  <button id="install-close" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
-  <div class="install-icon">📲</div>
-  <div class="install-text">
-    <h4>Instalar DTF Studio</h4>
-    <p>Añade la app a tu pantalla de inicio para usarla sin internet</p>
+<div id="resize-modal">
+  <div class="modal-card">
+    <h3>⊞ Redimensionar</h3>
+    <div class="sh">Ancho (px)</div>
+    <input class="num-input" type="number" id="resize-w" style="margin-bottom:10px">
+    <div class="sh">Alto (px)</div>
+    <input class="num-input" type="number" id="resize-h" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      <input type="checkbox" id="resize-lock" checked style="width:16px;height:16px;cursor:pointer">
+      <label for="resize-lock" style="font-size:11px;color:var(--text);cursor:pointer">Mantener proporción</label>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn green full" onclick="applyResize()">✓ Aplicar</button>
+      <button class="btn muted full" onclick="document.getElementById('resize-modal').classList.remove('show')">Cancelar</button>
+    </div>
   </div>
-  <button id="install-btn">Instalar</button>
 </div>
 
-<!-- iOS Install Hint -->
-<div id="ios-hint">
-  <h4>📲 Instalar en iPhone / iPad</h4>
-  <p>
-    1. Toca el botón <strong>Compartir</strong> (□↑) en Safari<br/>
-    2. Selecciona <strong>"Añadir a pantalla de inicio"</strong><br/>
-    3. Toca <strong>"Añadir"</strong> — ¡listo!
-  </p>
-  <button class="btn muted full" id="ios-close" onclick="document.getElementById('ios-hint').classList.remove('show')">Entendido</button>
+<div id="install-banner">
+  <button id="install-close" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
+  <div style="font-size:26px;flex-shrink:0">📲</div>
+  <div class="install-text"><h4>Instalar DTF Studio</h4><p>Añade la app a tu pantalla de inicio</p></div>
+  <button id="install-btn">Instalar</button>
 </div>
 
 <canvas id="export-canvas" style="display:none"></canvas>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────────
-const MAX = 5;
-const COLORS = ["#00C8FF","#FF4F1F","#00E676","#FFD600","#A855F7"];
-const LABELS = ["IMG 1","IMG 2","IMG 3","IMG 4","IMG 5"];
+const MAX=5,COLORS=['#00C8FF','#FF4F1F','#00E676','#FFD600','#A855F7'],LABELS=['IMG 1','IMG 2','IMG 3','IMG 4','IMG 5'];
+const PRESETS=[{id:'a4',label:'A4 300dpi',w:2480,h:3508},{id:'a3',label:'A3 300dpi',w:3508,h:4961},{id:'shirt',label:'Camisa 12x12"',w:3543,h:3543},{id:'custom',label:'Personalizado',w:0,h:0}];
+const SK='dtf_s_v3';
 
-let slots = Array.from({length:MAX},(_,i)=>({
-  id:i, img:null, src:null,
-  adj:{brightness:100,contrast:100,saturation:100,hue:0,rotate:0,mirrorH:false,mirrorV:false,
-       opacity:100,bgRemove:false,bgTol:35,bgTarget:"white",
-       htOn:false,htSize:6,htSpacing:10,htAngle:45,htColor:"#000000",htMode:"dot",texts:[]}
-}));
-let activeSlot = 0;
-let currentTab = "adjust";
-let pickerTargetSlot = 0;
-let cropMode = false, cropRect = null, cropDrag = false, cropStart = null;
-let activeTextId = null;
-let deferredPrompt = null;
+function loadSaved(){try{return JSON.parse(localStorage.getItem(SK))||{}}catch{return{}}}
+function saveSettings(){try{localStorage.setItem(SK,JSON.stringify({expPreset,expFmt,customW,customH,tf:{...tf}}))}catch{}}
 
-// Text form state
-let tf = { content:"", size:48, color:"#ffffff", font:"Arial", bold:false, x:50, y:50, stroke:false, strokeColor:"#000000" };
-// Export state
-let expPreset = "a4", expFmt = "png", customW = 3000, customH = 3000;
-let outputUrl = null;
+const sv=loadSaved();
+let slots=Array.from({length:MAX},(_,i)=>({id:i,img:null,src:null,adj:{brightness:100,contrast:100,saturation:100,hue:0,rotate:0,mirrorH:false,mirrorV:false,opacity:100,bgRemove:false,bgTol:35,bgTarget:'white',htOn:false,htSize:8,htSpacing:14,htAngle:45,htColor:'#000000',htMode:'dot',wmOn:false,wmText:'DTF Studio',wmOpacity:40,wmSize:28,wmColor:'#ffffff',wmPos:'br',texts:[]}}));
+let activeSlot=0,currentTab='adjust',pickerTarget=0,cropMode=false,cropRect=null,cropDrag=false,cropStart=null,activeTextId=null,deferredPrompt=null;
+let history=[];try{history=JSON.parse(localStorage.getItem('dtf_hist_v1'))||[]}catch{}
+let expPreset=sv.expPreset||'a4',expFmt=sv.expFmt||'png',customW=sv.customW||3000,customH=sv.customH||3000;
+let tf=sv.tf||{content:'',size:48,color:'#ffffff',font:'Arial',bold:false,x:50,y:50,stroke:false,strokeColor:'#000000'};
+const S=()=>slots[activeSlot],A=()=>S().adj;
 
-const PRESETS = [
-  {id:"a4",label:"A4 300dpi",w:2480,h:3508},
-  {id:"a3",label:"A3 300dpi",w:3508,h:4961},
-  {id:"shirt",label:'Camisa 12×12"',w:3543,h:3543},
-  {id:"custom",label:"Personalizado",w:0,h:0},
-];
-
-const S = () => slots[activeSlot];
-const A = () => S().adj;
-
-// ── Render Slots Bar ───────────────────────────────────────────────────────────
-function renderSlotsBar() {
-  const bar = document.getElementById("slots-bar");
-  bar.innerHTML = "";
-  slots.forEach((s,i) => {
-    const div = document.createElement("div");
-    div.className = "slot" + (s.img?" has-img":"") + (i===activeSlot?" active":"");
-    div.style.borderColor = i===activeSlot ? COLORS[i] : "var(--border)";
-    if (i===activeSlot) div.style.boxShadow = `0 0 14px ${COLORS[i]}44`;
-
-    const num = document.createElement("div");
-    num.className = "slot-num";
-    num.style.color = COLORS[i];
-    num.textContent = (i+1).toString();
-
-    if (s.img) {
-      const img = document.createElement("img");
-      img.src = s.src; img.alt = "";
-      div.appendChild(img);
-      const del = document.createElement("div");
-      del.className = "slot-del";
-      del.textContent = "✕";
-      del.onclick = e => { e.stopPropagation(); clearSlot(i); };
-      div.appendChild(del);
-    } else {
-      const empty = document.createElement("div");
-      empty.className = "slot-empty";
-      empty.innerHTML = `<span>+</span><small>${LABELS[i]}</small>`;
-      div.appendChild(empty);
-    }
-    div.appendChild(num);
-    div.onclick = () => { if (s.img) { activeSlot=i; refresh(); } else openPicker(i); };
-    bar.appendChild(div);
+function renderSlotsBar(){
+  const bar=document.getElementById('slots-bar');bar.innerHTML='';
+  slots.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='slot'+(s.img?' has-img':'')+(i===activeSlot?' active':'');
+    d.style.borderColor=i===activeSlot?COLORS[i]:'var(--border)';
+    if(i===activeSlot)d.style.boxShadow=`0 0 14px ${COLORS[i]}44`;
+    const n=document.createElement('div');n.className='slot-num';n.style.color=COLORS[i];n.textContent=i+1;
+    if(s.img){const im=document.createElement('img');im.src=s.src;d.appendChild(im);const dl=document.createElement('div');dl.className='slot-del';dl.textContent='✕';dl.onclick=e=>{e.stopPropagation();clearSlot(i)};d.appendChild(dl)}
+    else{const em=document.createElement('div');em.className='slot-empty';em.innerHTML=`<span>+</span><small>${LABELS[i]}</small>`;d.appendChild(em)}
+    d.appendChild(n);d.onclick=()=>{if(s.img){activeSlot=i;refresh()}else openPicker(i)};bar.appendChild(d);
   });
 }
 
-// ── Canvas Rendering ───────────────────────────────────────────────────────────
-function buildFilter(a) {
-  return `brightness(${a.brightness}%) contrast(${a.contrast}%) saturate(${a.saturation}%) hue-rotate(${a.hue}deg)`;
-}
+function bf(a){return`brightness(${a.brightness}%) contrast(${a.contrast}%) saturate(${a.saturation}%) hue-rotate(${a.hue}deg)`}
 
-function renderPreview() {
-  const canvas = document.getElementById("preview");
-  const empty = document.getElementById("empty-state");
-  const s = S();
-  if (!s.img) {
-    canvas.style.display = "none"; empty.style.display = "block"; return;
-  }
-  canvas.style.display = "block"; empty.style.display = "none";
-  const maxW = Math.min(500, window.innerWidth - 280), maxH = window.innerHeight - 200;
-  const sc = Math.min(maxW/s.img.naturalWidth, maxH/s.img.naturalHeight, 1);
-  const cw = Math.round(s.img.naturalWidth*sc), ch = Math.round(s.img.naturalHeight*sc);
-  canvas.width = cw; canvas.height = ch;
-  const ctx = canvas.getContext("2d");
+function renderPreview(){
+  const cv=document.getElementById('preview'),em=document.getElementById('empty-state'),s=S();
+  if(!s.img){cv.style.display='none';em.style.display='block';return}
+  cv.style.display='block';em.style.display='none';
+  const wrap=document.getElementById('canvas-wrap');
+  const mw=wrap.clientWidth-28,mh=wrap.clientHeight-28;
+  const sc=Math.min(mw/s.img.naturalWidth,mh/s.img.naturalHeight,1);
+  const cw=Math.round(s.img.naturalWidth*sc),ch=Math.round(s.img.naturalHeight*sc);
+  cv.width=cw;cv.height=ch;
+  const ctx=cv.getContext('2d'),a=A();
   ctx.clearRect(0,0,cw,ch);
-  const a = A();
-  ctx.save();
-  ctx.globalAlpha = a.opacity/100;
-  ctx.translate(cw/2,ch/2);
-  if (a.rotate) ctx.rotate(a.rotate*Math.PI/180);
-  ctx.scale(a.mirrorH?-1:1, a.mirrorV?-1:1);
-  ctx.filter = buildFilter(a);
-  ctx.drawImage(s.img,-cw/2,-ch/2,cw,ch);
-  ctx.restore();
-  if (a.bgRemove) applyBgCanvas(canvas,a.bgTol,a.bgTarget);
-  if (a.htOn) applyHalfCanvas(canvas,a.htSize,a.htSpacing,a.htAngle,a.htColor,a.htMode);
-  a.texts.forEach(t => drawTextOnCanvas(ctx,t,cw,ch,t.id===activeTextId));
-  if (cropMode&&cropRect) drawCropOverlay(ctx,cropRect,cw,ch);
+  ctx.save();ctx.globalAlpha=a.opacity/100;ctx.translate(cw/2,ch/2);
+  if(a.rotate)ctx.rotate(a.rotate*Math.PI/180);
+  ctx.scale(a.mirrorH?-1:1,a.mirrorV?-1:1);ctx.filter=bf(a);
+  ctx.drawImage(s.img,-cw/2,-ch/2,cw,ch);ctx.restore();
+  if(a.bgRemove)applyBg(cv,a.bgTol,a.bgTarget);
+  if(a.htOn)applyHT(cv,a.htSize,a.htSpacing,a.htAngle,a.htColor,a.htMode);
+  if(a.wmOn)drawWM(ctx,a,cw,ch);
+  a.texts.forEach(t=>drawTxt(ctx,t,cw,ch,t.id===activeTextId));
+  if(cropMode&&cropRect)drawCropOvl(ctx,cropRect,cw,ch);
 }
 
-function applyBgCanvas(canvas,tol,target) {
-  const ctx=canvas.getContext("2d");
-  const id=ctx.getImageData(0,0,canvas.width,canvas.height); const d=id.data;
+function applyBg(cv,tol,target){
+  const ctx=cv.getContext('2d'),id=ctx.getImageData(0,0,cv.width,cv.height),d=id.data;
   const cr=d[0],cg=d[1],cb=d[2];
   for(let i=0;i<d.length;i+=4){
-    const r=d[i],g=d[i+1],b=d[i+2]; let hit=false;
-    if(target==="white"){const br=(r+g+b)/3;hit=br>(255-tol)&&(Math.max(r,g,b)-Math.min(r,g,b))<tol+10;}
-    else if(target==="black"){const br=(r+g+b)/3;hit=br<tol&&(Math.max(r,g,b)-Math.min(r,g,b))<20;}
-    else{hit=Math.abs(r-cr)<tol&&Math.abs(g-cg)<tol&&Math.abs(b-cb)<tol;}
+    const r=d[i],g=d[i+1],b=d[i+2];let hit=false;
+    if(target==='white'){const br=(r+g+b)/3;hit=br>(255-tol)&&(Math.max(r,g,b)-Math.min(r,g,b))<tol+10}
+    else if(target==='black'){const br=(r+g+b)/3;hit=br<tol&&(Math.max(r,g,b)-Math.min(r,g,b))<20}
+    else{hit=Math.abs(r-cr)<tol&&Math.abs(g-cg)<tol&&Math.abs(b-cb)<tol}
     if(hit)d[i+3]=0;
   }
   ctx.putImageData(id,0,0);
 }
 
-function applyHalfCanvas(canvas,size,spacing,angle,color,mode){
-  const ctx=canvas.getContext("2d"); const w=canvas.width,h=canvas.height;
-  const src=ctx.getImageData(0,0,w,h); const d=src.data;
-  const tmp=document.createElement("canvas"); tmp.width=1;tmp.height=1;
-  const tc=tmp.getContext("2d"); tc.fillStyle=color; tc.fillRect(0,0,1,1);
-  const[cr,cg,cb]=tc.getImageData(0,0,1,1).data;
-  ctx.clearRect(0,0,w,h); ctx.putImageData(src,0,0);
-  const rad=angle*Math.PI/180;
-  for(let y=-h;y<h*2;y+=spacing){for(let x=-w;x<w*2;x+=spacing){
-    const rx=Math.round(x*Math.cos(rad)-y*Math.sin(rad));
-    const ry=Math.round(x*Math.sin(rad)+y*Math.cos(rad));
-    if(rx<0||rx>=w||ry<0||ry>=h)continue;
-    const idx=(ry*w+rx)*4;
-    const bright=(d[idx]+d[idx+1]+d[idx+2])/3/255;
-    if(d[idx+3]<25)continue;
-    const r=(size/2)*(1-bright); if(r<0.4)continue;
-    ctx.save();ctx.globalAlpha=0.85;ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
-    ctx.translate(rx,ry);ctx.beginPath();
-    if(mode==="dot"){ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();}
-    else if(mode==="line"){ctx.fillRect(-r/2,-r*1.4,r,r*2.8);}
-    else{ctx.fillRect(-r/2,-r*1.4,r,r*2.8);ctx.fillRect(-r*1.4,-r/2,r*2.8,r);}
-    ctx.restore();
-  }}
-}
-
-function drawTextOnCanvas(ctx,t,cw,ch,selected) {
+function applyHT(cv,dotSz,spacing,angle,color,mode){
+  const ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+  const snap=ctx.getImageData(0,0,w,h),d=snap.data;
+  const tc=document.createElement('canvas');tc.width=1;tc.height=1;
+  const tc2=tc.getContext('2d');tc2.fillStyle=color;tc2.fillRect(0,0,1,1);
+  const cd=tc2.getImageData(0,0,1,1).data;
+  const[dr,dg,db]=[cd[0],cd[1],cd[2]];
+  const rad=angle*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad);
   ctx.save();
-  ctx.font=`${t.bold?"bold ":""}${t.size}px ${t.font}`;
-  ctx.fillStyle=t.color; ctx.textAlign="center"; ctx.textBaseline="middle";
-  const x=(t.x/100)*cw, y=(t.y/100)*ch;
-  if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size/10;ctx.strokeText(t.content,x,y);}
-  ctx.fillText(t.content,x,y);
-  if(selected){
-    const w2=ctx.measureText(t.content).width;
-    ctx.strokeStyle=COLORS[activeSlot];ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
-    ctx.strokeRect(x-w2/2-6,y-t.size/2-4,w2+12,t.size+8);
+  for(let gy=-h;gy<h*2;gy+=spacing){
+    for(let gx=-w;gx<w*2;gx+=spacing){
+      const px=Math.round(gx*cos-gy*sin),py=Math.round(gx*sin+gy*cos);
+      if(px<0||px>=w||py<0||py>=h)continue;
+      const idx=(py*w+px)*4;
+      if(d[idx+3]<20)continue;
+      const bright=(d[idx]+d[idx+1]+d[idx+2])/765;
+      const r=(dotSz/2)*(1-bright*0.85);
+      if(r<0.5)continue;
+      ctx.fillStyle=`rgba(${dr},${dg},${db},0.9)`;
+      ctx.beginPath();
+      if(mode==='dot'){ctx.arc(px,py,r,0,Math.PI*2);ctx.fill()}
+      else if(mode==='line'){ctx.save();ctx.translate(px,py);ctx.rotate(rad);ctx.fillRect(-r/2,-r*1.5,r,r*3);ctx.restore()}
+      else{ctx.save();ctx.translate(px,py);ctx.fillRect(-r/2,-r*1.5,r,r*3);ctx.fillRect(-r*1.5,-r/2,r*3,r);ctx.restore()}
+    }
   }
   ctx.restore();
 }
 
-function drawCropOverlay(ctx,cr,cw,ch){
-  ctx.save();
-  ctx.fillStyle="rgba(0,0,0,0.55)";ctx.fillRect(0,0,cw,ch);
+function drawWM(ctx,a,cw,ch){
+  ctx.save();ctx.globalAlpha=a.wmOpacity/100;
+  ctx.font=`bold ${a.wmSize}px Syne,Arial`;ctx.fillStyle=a.wmColor;
+  const mw=ctx.measureText(a.wmText).width,pad=12;
+  let x,y;
+  if(a.wmPos==='tl'){x=pad;y=pad;ctx.textBaseline='top'}
+  else if(a.wmPos==='tr'){x=cw-mw-pad;y=pad;ctx.textBaseline='top'}
+  else if(a.wmPos==='bl'){x=pad;y=ch-pad;ctx.textBaseline='bottom'}
+  else if(a.wmPos==='c'){x=(cw-mw)/2;y=ch/2;ctx.textBaseline='middle'}
+  else{x=cw-mw-pad;y=ch-pad;ctx.textBaseline='bottom'}
+  ctx.fillText(a.wmText,x,y);ctx.restore();
+}
+
+function drawTxt(ctx,t,cw,ch,sel){
+  ctx.save();ctx.font=`${t.bold?'bold ':''}${t.size}px ${t.font}`;
+  ctx.fillStyle=t.color;ctx.textAlign='center';ctx.textBaseline='middle';
+  const x=(t.x/100)*cw,y=(t.y/100)*ch;
+  if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size/10;ctx.strokeText(t.content,x,y)}
+  ctx.fillText(t.content,x,y);
+  if(sel){const w2=ctx.measureText(t.content).width;ctx.strokeStyle=COLORS[activeSlot];ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.strokeRect(x-w2/2-6,y-t.size/2-4,w2+12,t.size+8)}
+  ctx.restore();
+}
+
+function drawCropOvl(ctx,cr,cw,ch){
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(0,0,cw,ch);
   ctx.clearRect(cr.x,cr.y,cr.w,cr.h);
   ctx.strokeStyle=COLORS[activeSlot];ctx.lineWidth=2;ctx.setLineDash([]);
   ctx.strokeRect(cr.x,cr.y,cr.w,cr.h);
   [1/3,2/3].forEach(f=>{
-    ctx.strokeStyle=COLORS[activeSlot]+"55";ctx.lineWidth=0.5;
+    ctx.strokeStyle=COLORS[activeSlot]+'55';ctx.lineWidth=.5;
     ctx.beginPath();ctx.moveTo(cr.x+cr.w*f,cr.y);ctx.lineTo(cr.x+cr.w*f,cr.y+cr.h);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cr.x,cr.y+cr.h*f);ctx.lineTo(cr.x+cr.w,cr.y+cr.h*f);ctx.stroke();
   });
   ctx.restore();
 }
 
-// ── Toolbar Actions ────────────────────────────────────────────────────────────
-function rotateSlot(deg){
-  A().rotate=(A().rotate+deg+360)%360; refresh();
+function getXY(e,cv){
+  const r=cv.getBoundingClientRect(),sx=cv.width/r.width,sy=cv.height/r.height;
+  const src=e.touches?e.touches[0]:e.changedTouches?e.changedTouches[0]:e;
+  return{x:(src.clientX-r.left)*sx,y:(src.clientY-r.top)*sy};
 }
-function toggleMirror(dir){
-  if(dir==="H") A().mirrorH=!A().mirrorH;
-  else A().mirrorV=!A().mirrorV;
-  refresh();
-}
-function toggleCrop(){
-  cropMode=!cropMode; cropRect=null;
-  document.getElementById("crop-btn").classList.toggle("on",cropMode);
-  document.getElementById("apply-crop-btn").style.display="none";
-  renderPreview();
-}
+
+const cv=document.getElementById('preview');
+['mousedown','touchstart'].forEach(ev=>cv.addEventListener(ev,e=>{
+  if(!cropMode)return;if(ev==='touchstart')e.preventDefault();
+  const p=getXY(e,cv);cropStart=p;cropDrag=true;cropRect=null;
+},{passive:false}));
+['mousemove','touchmove'].forEach(ev=>cv.addEventListener(ev,e=>{
+  if(!cropDrag||!cropStart)return;if(ev==='touchmove')e.preventDefault();
+  const p=getXY(e,cv);cropRect={x:Math.min(cropStart.x,p.x),y:Math.min(cropStart.y,p.y),w:Math.abs(p.x-cropStart.x),h:Math.abs(p.y-cropStart.y)};renderPreview();
+},{passive:false}));
+['mouseup','touchend'].forEach(ev=>cv.addEventListener(ev,e=>{
+  if(ev==='touchend')e.preventDefault();cropDrag=false;
+  if(cropRect&&cropRect.w>8)document.getElementById('apply-crop-btn').style.display='';
+},{passive:false}));
+
+function toggleCrop(){cropMode=!cropMode;cropRect=null;document.getElementById('crop-btn').classList.toggle('on',cropMode);document.getElementById('apply-crop-btn').style.display='none';renderPreview()}
 function applyCrop(){
   if(!cropRect||cropRect.w<5||!S().img)return;
-  const canvas=document.getElementById("preview");
-  const sc=S().img.naturalWidth/canvas.width;
-  const sc2=S().img.naturalHeight/canvas.height;
-  const cx=Math.round(cropRect.x*sc),cy=Math.round(cropRect.y*sc2);
-  const cw=Math.round(cropRect.w*sc),ch=Math.round(cropRect.h*sc2);
-  const tmp=document.createElement("canvas");tmp.width=cw;tmp.height=ch;
-  tmp.getContext("2d").drawImage(S().img,cx,cy,cw,ch,0,0,cw,ch);
-  const ni=new Image();
-  ni.onload=()=>{slots[activeSlot].img=ni;setTimeout(renderPreview,60);};
-  ni.src=tmp.toDataURL();
-  cropMode=false;cropRect=null;
-  document.getElementById("crop-btn").classList.remove("on");
-  document.getElementById("apply-crop-btn").style.display="none";
+  const tmp=document.createElement('canvas');tmp.width=Math.round(cropRect.w);tmp.height=Math.round(cropRect.h);
+  tmp.getContext('2d').drawImage(cv,cropRect.x,cropRect.y,cropRect.w,cropRect.h,0,0,cropRect.w,cropRect.h);
+  const ni=new Image();ni.onload=()=>{slots[activeSlot].img=ni;slots[activeSlot].src=ni.src;setTimeout(()=>{renderPreview();renderSlotsBar()},60)};
+  ni.src=tmp.toDataURL();cropMode=false;cropRect=null;
+  document.getElementById('crop-btn').classList.remove('on');document.getElementById('apply-crop-btn').style.display='none';
 }
 
-// Crop mouse/touch
-const canvas=document.getElementById("preview");
-canvas.addEventListener("mousedown",e=>{if(!cropMode)return;const r=canvas.getBoundingClientRect();cropStart={x:e.clientX-r.left,y:e.clientY-r.top};cropDrag=true;cropRect=null;});
-canvas.addEventListener("mousemove",e=>{if(!cropDrag||!cropStart)return;const r=canvas.getBoundingClientRect();const cx=e.clientX-r.left,cy=e.clientY-r.top;cropRect={x:Math.min(cropStart.x,cx),y:Math.min(cropStart.y,cy),w:Math.abs(cx-cropStart.x),h:Math.abs(cy-cropStart.y)};renderPreview();});
-canvas.addEventListener("mouseup",()=>{cropDrag=false;if(cropRect&&cropRect.w>5)document.getElementById("apply-crop-btn").style.display="";});
-canvas.addEventListener("touchstart",e=>{if(!cropMode)return;const r=canvas.getBoundingClientRect();cropStart={x:e.touches[0].clientX-r.left,y:e.touches[0].clientY-r.top};cropDrag=true;cropRect=null;},{passive:true});
-canvas.addEventListener("touchmove",e=>{if(!cropDrag||!cropStart)return;const r=canvas.getBoundingClientRect();const cx=e.touches[0].clientX-r.left,cy=e.touches[0].clientY-r.top;cropRect={x:Math.min(cropStart.x,cx),y:Math.min(cropStart.y,cy),w:Math.abs(cx-cropStart.x),h:Math.abs(cy-cropStart.y)};renderPreview();},{passive:true});
-canvas.addEventListener("touchend",()=>{cropDrag=false;if(cropRect&&cropRect.w>5)document.getElementById("apply-crop-btn").style.display="";});
-
-// ── Media Picker ───────────────────────────────────────────────────────────────
-function openPicker(slot){
-  pickerTargetSlot = slot===-1 ? slots.findIndex(s=>!s.img) : slot;
-  if(pickerTargetSlot===-1) pickerTargetSlot=0;
-  const lbl=document.getElementById("picker-slot-label");
-  lbl.textContent=`Cargando en ${LABELS[pickerTargetSlot]} (${pickerTargetSlot+1}/5)`;
-  document.getElementById("picker-modal").classList.add("show");
+function showResizeModal(){
+  if(!S().img)return;
+  const rw=document.getElementById('resize-w'),rh=document.getElementById('resize-h');
+  rw.value=S().img.naturalWidth;rh.value=S().img.naturalHeight;
+  const ratio=S().img.naturalWidth/S().img.naturalHeight;
+  rw.oninput=()=>{if(document.getElementById('resize-lock').checked)rh.value=Math.round(rw.value/ratio)};
+  rh.oninput=()=>{if(document.getElementById('resize-lock').checked)rw.value=Math.round(rh.value*ratio)};
+  document.getElementById('resize-modal').classList.add('show');
 }
-function closePicker(){ document.getElementById("picker-modal").classList.remove("show"); }
-function triggerGallery(){ document.getElementById("file-gallery").click(); }
-function triggerCamera(){ document.getElementById("file-camera").click(); }
+function applyResize(){
+  const nw=parseInt(document.getElementById('resize-w').value),nh=parseInt(document.getElementById('resize-h').value);
+  if(!nw||!nh)return;
+  const tmp=document.createElement('canvas');tmp.width=nw;tmp.height=nh;
+  tmp.getContext('2d').drawImage(S().img,0,0,nw,nh);
+  const ni=new Image();ni.onload=()=>{slots[activeSlot].img=ni;slots[activeSlot].src=ni.src;refresh()};
+  ni.src=tmp.toDataURL();document.getElementById('resize-modal').classList.remove('show');
+}
+
+async function removeBackgroundAI(){
+  if(!S().img){alert('Primero carga una imagen');return}
+  document.getElementById('ai-overlay').classList.add('show');
+  await new Promise(r=>setTimeout(r,80));
+  try{
+    const img=S().img,tmp=document.createElement('canvas');
+    tmp.width=img.naturalWidth;tmp.height=img.naturalHeight;
+    const ctx=tmp.getContext('2d');ctx.drawImage(img,0,0);
+    const id=ctx.getImageData(0,0,tmp.width,tmp.height),d=id.data,w=tmp.width,h=tmp.height;
+    const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1],[Math.floor(w/2),0],[0,Math.floor(h/2)],[w-1,Math.floor(h/2)],[Math.floor(w/2),h-1]];
+    let sr=0,sg=0,sb=0;
+    corners.forEach(([cx,cy])=>{const i=(cy*w+cx)*4;sr+=d[i];sg+=d[i+1];sb+=d[i+2]});
+    const bgR=sr/corners.length,bgG=sg/corners.length,bgB=sb/corners.length;
+    const tol=A().bgTol+25;
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i],g=d[i+1],b=d[i+2];
+      const diff=Math.sqrt((r-bgR)**2+(g-bgG)**2+(b-bgB)**2);
+      if(diff<tol)d[i+3]=0;else if(diff<tol*1.6)d[i+3]=Math.round(255*(diff-tol)/(tol*.6));
+    }
+    ctx.putImageData(id,0,0);
+    const ni=new Image();ni.onload=()=>{slots[activeSlot].img=ni;addToHistory(ni.src,'BG Eliminado');renderPreview();renderSlotsBar()};
+    ni.src=tmp.toDataURL('image/png');
+  }catch(e){console.error(e)}
+  document.getElementById('ai-overlay').classList.remove('show');
+}
+
+function addToHistory(src,name){
+  history.unshift({src,name,date:new Date().toLocaleTimeString()});
+  if(history.length>20)history=history.slice(0,20);
+  try{localStorage.setItem('dtf_hist_v1',JSON.stringify(history))}catch{}
+}
+function loadFromHistory(idx){
+  const item=history[idx];if(!item)return;
+  const img=new Image();img.onload=()=>{const si=slots.findIndex(s=>!s.img);const i=si===-1?activeSlot:si;slots[i].img=img;slots[i].src=item.src;activeSlot=i;refresh()};img.src=item.src;
+}
+
+function openPicker(slot){pickerTarget=slot===-1?Math.max(0,slots.findIndex(s=>!s.img)):slot;document.getElementById('picker-slot-label').textContent=`Cargando en ${LABELS[pickerTarget]} (${pickerTarget+1}/5)`;document.getElementById('picker-modal').classList.add('show')}
+function closePicker(){document.getElementById('picker-modal').classList.remove('show')}
+function triggerGallery(){document.getElementById('file-gallery').click()}
+function triggerCamera(){document.getElementById('file-camera').click()}
 function onFilePicked(e){
-  const files=Array.from(e.target.files); if(!files.length)return;
-  closePicker();
-  files.forEach((file,fi)=>{
-    const si=Math.min(pickerTargetSlot+fi,MAX-1);
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const src=ev.target.result;
-      const img=new Image();
-      img.onload=()=>{
-        slots[si].img=img; slots[si].src=src;
-        activeSlot=si; refresh();
-      };
-      img.src=src;
-    };
-    reader.readAsDataURL(file);
-  });
-  e.target.value="";
+  const files=Array.from(e.target.files);if(!files.length)return;closePicker();
+  files.forEach((f,fi)=>{
+    const si=Math.min(pickerTarget+fi,MAX-1);const rd=new FileReader();
+    rd.onload=ev=>{const src=ev.target.result;const im=new Image();im.onload=()=>{slots[si].img=im;slots[si].src=src;activeSlot=si;addToHistory(src,f.name.replace(/\.[^.]+$/,''));refresh()};im.src=src};
+    rd.readAsDataURL(f);
+  });e.target.value='';
 }
-function clearSlot(i){
-  slots[i].img=null;slots[i].src=null;
-  if(activeSlot===i){const ni=slots.findIndex(s=>s.img);activeSlot=ni===-1?0:ni;}
-  refresh();
-}
+function clearSlot(i){slots[i].img=null;slots[i].src=null;if(activeSlot===i){const ni=slots.findIndex(s=>s.img);activeSlot=ni===-1?0:ni}refresh()}
 
-// ── Tabs & Tool Panel ──────────────────────────────────────────────────────────
-function switchTab(id){
-  currentTab=id;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
-  document.getElementById("tab-"+id).classList.add("on");
-  renderToolPanel();
-}
+function switchTab(id){currentTab=id;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));document.getElementById('tab-'+id).classList.add('on');renderToolPanel()}
+function togglePanel(){document.getElementById('right-panel').classList.toggle('open');document.getElementById('panel-overlay').classList.toggle('show')}
 
-function togglePanel(){
-  const p=document.getElementById("right-panel");
-  const o=document.getElementById("panel-overlay");
-  p.classList.toggle("open");
-  o.classList.toggle("show");
-}
-
-function sl(label,key,min,max,step=1,unit=""){
-  const a=A(); const v=a[key];
-  return `<div class="slider-row">
-    <div class="slider-label"><span>${label}</span><span class="slider-val">${v}${unit}</span></div>
-    <input type="range" min="${min}" max="${max}" step="${step}" value="${v}"
-      oninput="A()['${key}']=Number(this.value);document.querySelector('.slider-val').textContent;renderToolPanel2('${key}',this.value);renderPreview()">
-  </div>`;
-}
-function sl2(label,key,min,max,step,unit){
-  const a=A(); const v=a[key];
-  return `<div class="slider-row">
-    <div class="slider-label"><span style="color:var(--text)">${label}</span>
-    <span class="slider-val" id="sv-${key}">${v}${unit||""}</span></div>
-    <input type="range" min="${min}" max="${max}" step="${step||1}" value="${v}"
-      oninput="A()['${key}']=Number(this.value);document.getElementById('sv-${key}').textContent=this.value+'${unit||''}';renderPreview()">
-  </div>`;
-}
-function tog2(label,key,color){
+function sld(label,key,min,max,step,unit){
   const v=A()[key];
-  return `<div class="tog-row"><span>${label}</span>
-    <div class="tog${v?" on":""}" style="${v?`background:${color||'var(--accent)'}`:''}" onclick="A()['${key}']=!A()['${key}'];renderToolPanel();renderPreview()"></div>
-  </div>`;
+  return`<div class="slider-row"><div class="slider-label"><span style="color:var(--text)">${label}</span><span class="slider-val" id="sv-${key}">${v}${unit||''}</span></div><input type="range" min="${min}" max="${max}" step="${step||1}" value="${v}" oninput="A()['${key}']=Number(this.value);document.getElementById('sv-${key}').textContent=this.value+'${unit||''}';renderPreview();saveSettings()"></div>`;
+}
+function tg(label,key,col){
+  const v=A()[key];
+  return`<div class="tog-row"><span>${label}</span><div class="tog${v?' on':''}" style="${v?`background:${col||'var(--accent)'}`:''}" onclick="A()['${key}']=!A()['${key}'];renderToolPanel();renderPreview();saveSettings()"></div></div>`;
+}
+function sldTF(label,key,min,max,step,unit){
+  const v=tf[key];
+  return`<div class="slider-row"><div class="slider-label"><span style="color:var(--text)">${label}</span><span class="slider-val" id="stf-${key}">${v}${unit||''}</span></div><input type="range" min="${min}" max="${max}" step="${step||1}" value="${v}" oninput="tf['${key}']=Number(this.value);document.getElementById('stf-${key}').textContent=this.value+'${unit||''}'"></div>`;
 }
 
 function renderToolPanel(){
-  const body=document.getElementById("tool-body");
-  const a=A(); const c=COLORS[activeSlot];
-  let h="";
-
-  if(currentTab==="adjust"){
-    h=`<div class="sh">Color · ${LABELS[activeSlot]}</div>
-    ${sl2("Brillo","brightness",0,200,1,"%")}
-    ${sl2("Contraste","contrast",0,200,1,"%")}
-    ${sl2("Saturación","saturation",0,200,1,"%")}
-    ${sl2("Tono","hue",0,360,1,"°")}
-    ${sl2("Opacidad","opacity",0,100,1,"%")}
-    <div class="sh" style="margin-top:12px">Rotación</div>
-    <div class="rot-btns">
-      ${[0,90,180,270].map(r=>`<button class="rot-btn${a.rotate===r?" on":""}" onclick="A().rotate=${r};renderToolPanel();renderPreview()">${r}°</button>`).join("")}
-    </div>
-    ${tog2("Espejo Horizontal","mirrorH")}
-    ${tog2("Espejo Vertical","mirrorV")}
+  const body=document.getElementById('tool-body'),a=A();let h='';
+  if(currentTab==='adjust'){
+    h=`<div class="sh" style="border-color:${COLORS[activeSlot]}">Color · ${LABELS[activeSlot]}</div>
+    ${sld('Brillo','brightness',0,200,1,'%')}${sld('Contraste','contrast',0,200,1,'%')}${sld('Saturación','saturation',0,200,1,'%')}${sld('Tono','hue',0,360,1,'°')}${sld('Opacidad','opacity',0,100,1,'%')}
+    <div class="sh" style="margin-top:10px">Rotación</div>
+    <div class="rot-btns">${[0,90,180,270].map(r=>`<button class="rot-btn${a.rotate===r?' on':''}" onclick="A().rotate=${r};renderToolPanel();renderPreview();saveSettings()">${r}°</button>`).join('')}</div>
+    ${tg('Espejo H','mirrorH')}${tg('Espejo V','mirrorV')}
     <button class="btn muted full" style="margin-top:8px" onclick="resetAdj()">↩ Restablecer</button>`;
   }
-
-  if(currentTab==="crop"){
+  if(currentTab==='crop'){
     h=`<div class="sh">Recorte Manual</div>
-    <div class="info-box blue">1. Toca "Activar Crop" ✂<br>2. Arrastra sobre la imagen<br>3. Toca "✓ Aplicar"</div>
-    <button class="btn full${cropMode?" ":" "}" style="${cropMode?`background:rgba(255,79,31,0.15);border-color:rgba(255,79,31,0.4);color:var(--accent2)`:""}" onclick="toggleCrop()">
-      ${cropMode?"✕ Cancelar Crop":"✂ Activar Crop"}
-    </button>
-    ${cropRect?`<button class="btn green full" style="margin-top:8px" onclick="applyCrop()">✓ Aplicar Recorte</button>`:""}
-    ${cropRect?`<div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:'IBM Plex Mono',monospace">Selección: ${Math.round(cropRect.w)}×${Math.round(cropRect.h)}px</div>`:""}`;
+    <div class="info-box blue">📱 <strong>En celular:</strong><br>1. Toca "Activar Crop"<br>2. Arrastra el dedo sobre la imagen<br>3. Toca "✓ Ok"</div>
+    <button class="btn full" style="${cropMode?'background:rgba(255,79,31,.15);border-color:rgba(255,79,31,.4);color:var(--accent2)':''}" onclick="toggleCrop()">${cropMode?'✕ Cancelar':'✂ Activar Crop'}</button>
+    ${cropRect?`<button class="btn green full" style="margin-top:8px" onclick="applyCrop()">✓ Aplicar Recorte</button>`:''}
+    <div style="margin-top:14px"><div class="sh">Redimensionar exacto</div>
+    <button class="btn yellow full" onclick="showResizeModal()">⊞ Cambiar tamaño</button></div>`;
   }
-
-  if(currentTab==="text"){
+  if(currentTab==='text'){
     const texts=a.texts;
     h=`<div class="sh">Añadir Texto</div>
     <textarea class="text-input" id="tf-content" placeholder="Escribe aquí...">${tf.content}</textarea>
-    <div class="row2">
-      <div style="flex:1"><select class="sel" id="tf-font" onchange="tf.font=this.value">
-        ${["Arial","Georgia","Impact","Courier New","Verdana","Times New Roman"].map(f=>`<option${f===tf.font?" selected":""}>${f}</option>`).join("")}
-      </select></div>
-      <input type="color" class="col-pick" value="${tf.color}" onchange="tf.color=this.value" title="Color">
-    </div>
-    <div class="slider-row">
-      <div class="slider-label"><span>Tamaño</span><span class="slider-val" id="sv-tsize">${tf.size}px</span></div>
-      <input type="range" min="8" max="200" value="${tf.size}" oninput="tf.size=Number(this.value);document.getElementById('sv-tsize').textContent=this.value+'px'">
-    </div>
-    <div class="slider-row">
-      <div class="slider-label"><span>Pos X</span><span class="slider-val" id="sv-tx">${tf.x}%</span></div>
-      <input type="range" min="0" max="100" value="${tf.x}" oninput="tf.x=Number(this.value);document.getElementById('sv-tx').textContent=this.value+'%'">
-    </div>
-    <div class="slider-row">
-      <div class="slider-label"><span>Pos Y</span><span class="slider-val" id="sv-ty">${tf.y}%</span></div>
-      <input type="range" min="0" max="100" value="${tf.y}" oninput="tf.y=Number(this.value);document.getElementById('sv-ty').textContent=this.value+'%'">
-    </div>
-    <div class="tog-row"><span>Negrita</span><div class="tog${tf.bold?" on":""}" onclick="tf.bold=!tf.bold;this.classList.toggle('on')"></div></div>
-    <div class="tog-row"><span>Contorno</span><div class="tog${tf.stroke?" on":""}" onclick="tf.stroke=!tf.stroke;renderToolPanel()"></div></div>
-    ${tf.stroke?`<div class="row2" style="align-items:center"><span style="font-size:11px">Color contorno</span><input type="color" class="col-pick" value="${tf.strokeColor}" onchange="tf.strokeColor=this.value"></div>`:""}
-    <button class="btn full" onclick="addText()" style="margin-top:4px">+ Añadir Texto</button>
-    ${texts.length?`<div class="sh" style="margin-top:14px">Textos</div>
-      ${texts.map(t=>`<div class="text-item${t.id===activeTextId?" active":""}" onclick="activeTextId='${t.id}';renderPreview()">
-        <div class="text-item-dot" style="background:${t.color}"></div>
-        <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.content}</span>
-        <button onclick="event.stopPropagation();removeText('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0">✕</button>
-      </div>`).join("")}`:""}`;
+    <div class="row2"><div style="flex:1"><select class="sel" id="tf-font" onchange="tf.font=this.value">${['Arial','Georgia','Impact','Courier New','Verdana','Times New Roman'].map(f=>`<option${f===tf.font?' selected':''}>${f}</option>`).join('')}</select></div>
+    <input type="color" class="col-pick" value="${tf.color}" onchange="tf.color=this.value"></div>
+    ${sldTF('Tamaño','size',8,200,1,'px')}${sldTF('Pos X','x',0,100,1,'%')}${sldTF('Pos Y','y',0,100,1,'%')}
+    <div class="tog-row"><span>Negrita</span><div class="tog${tf.bold?' on':''}" onclick="tf.bold=!tf.bold;this.classList.toggle('on')"></div></div>
+    <div class="tog-row"><span>Contorno</span><div class="tog${tf.stroke?' on':''}" onclick="tf.stroke=!tf.stroke;renderToolPanel()"></div></div>
+    ${tf.stroke?`<div class="row2" style="align-items:center"><span style="font-size:11px">Color contorno</span><input type="color" class="col-pick" value="${tf.strokeColor}" onchange="tf.strokeColor=this.value"></div>`:''}
+    <button class="btn full" onclick="addText()">+ Añadir Texto</button>
+    ${texts.length?`<div class="sh" style="margin-top:12px">Textos</div>${texts.map(t=>`<div class="text-item${t.id===activeTextId?' active':''}" onclick="activeTextId='${t.id}';renderPreview()"><div class="text-item-dot" style="background:${t.color}"></div><span style="font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.content}</span><button onclick="event.stopPropagation();removeText('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0">✕</button></div>`).join('')}`:''}`;
   }
-
-  if(currentTab==="halftone"){
-    h=`<div class="sh">Semitono (Halftone)</div>
-    ${tog2("Activar Semitono","htOn")}
-    ${a.htOn?`
-    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Forma del Punto</div>
-    <div class="ht-shapes">
-      ${[{id:"dot",l:"● Punto"},{id:"line",l:"| Línea"},{id:"cross",l:"+ Cruz"}].map(m=>
-        `<div class="ht-shape${a.htMode===m.id?" on":""}" onclick="A().htMode='${m.id}';renderToolPanel();renderPreview()">${m.l}</div>`
-      ).join("")}
-    </div>
-    ${sl2("Tamaño","htSize",2,20,1,"px")}
-    ${sl2("Espaciado","htSpacing",4,30,1,"px")}
-    ${sl2("Ángulo","htAngle",0,90,1,"°")}
-    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Color del Punto</div>
-    <div class="ht-colors">
-      ${["#000000","#FF4F1F","#00C8FF","#FFD600","#ffffff"].map(col=>
-        `<div class="ht-col${a.htColor===col?" on":""}" style="background:${col}" onclick="A().htColor='${col}';renderToolPanel();renderPreview()"></div>`
-      ).join("")}
-      <input type="color" class="col-pick" value="${a.htColor}" onchange="A().htColor=this.value;renderPreview()" style="width:24px;height:24px;border-radius:50%;padding:1px">
-    </div>`:""}`;
+  if(currentTab==='halftone'){
+    h=`<div class="sh">Semitono (Halftone)</div>${tg('Activar Semitono','htOn')}
+    ${a.htOn?`<div style="font-size:11px;color:var(--text);margin-bottom:7px">Forma</div>
+    <div class="shape-btns">${[{id:'dot',l:'● Punto'},{id:'line',l:'| Línea'},{id:'cross',l:'+ Cruz'}].map(m=>`<div class="shape-btn${a.htMode===m.id?' on':''}" onclick="A().htMode='${m.id}';renderToolPanel();renderPreview()">${m.l}</div>`).join('')}</div>
+    ${sld('Tamaño punto','htSize',2,28,1,'px')}${sld('Espaciado','htSpacing',4,50,1,'px')}${sld('Ángulo','htAngle',0,90,1,'°')}
+    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Color del punto</div>
+    <div class="ht-colors">${['#000000','#FF4F1F','#00C8FF','#FFD600','#ffffff','#ff00ff'].map(c=>`<div class="ht-col${a.htColor===c?' on':''}" style="background:${c};${c==='#ffffff'?'border-color:#555':''}" onclick="A().htColor='${c}';renderToolPanel();renderPreview()"></div>`).join('')}
+    <input type="color" class="col-pick" value="${a.htColor}" onchange="A().htColor=this.value;renderPreview()" style="width:24px;height:24px;border-radius:50%;padding:1px"></div>
+    <div class="info-box blue">💡 Efecto vintage/artístico para impresión DTF.</div>`:''}`;
   }
-
-  if(currentTab==="bg"){
-    h=`<div class="sh">Eliminar Fondo</div>
-    ${tog2("Activar","bgRemove","var(--green)")}
-    ${a.bgRemove?`
-    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Color a eliminar</div>
-    <div class="bg-targets">
-      ${[{id:"white",l:"⬜ Blanco"},{id:"black",l:"⬛ Negro"},{id:"auto",l:"🎯 Auto"}].map(t=>
-        `<div class="bg-target${a.bgTarget===t.id?" on":""}" onclick="A().bgTarget='${t.id}';renderToolPanel();renderPreview()">${t.l}</div>`
-      ).join("")}
-    </div>
-    ${sl2("Tolerancia","bgTol",5,80,1,"")}
-    <div class="info-box green">💡 Exporta en PNG para preservar transparencia en DTF.</div>`:""}`;
+  if(currentTab==='bg'){
+    h=`<div class="sh">Eliminar Fondo con IA</div>
+    <button class="btn purple full" onclick="removeBackgroundAI()" style="margin-bottom:12px">🤖 IA: Eliminar Fondo Auto</button>
+    <div class="sh">Por Color Específico</div>${tg('Activar','bgRemove','var(--green)')}
+    ${a.bgRemove?`<div style="font-size:11px;color:var(--text);margin-bottom:7px">Color a eliminar</div>
+    <div class="bg-targets">${[{id:'white',l:'⬜ Blanco'},{id:'black',l:'⬛ Negro'},{id:'auto',l:'🎯 Auto'}].map(t=>`<div class="bg-target${a.bgTarget===t.id?' on':''}" onclick="A().bgTarget='${t.id}';renderToolPanel();renderPreview()">${t.l}</div>`).join('')}</div>
+    ${sld('Tolerancia','bgTol',5,80,1,'')}`:''} 
+    <div class="info-box green" style="margin-top:6px">💡 Exporta en PNG para preservar transparencia en DTF.</div>`;
   }
-
-  if(currentTab==="export"){
-    const activeImgs=slots.filter(s=>s.img);
+  if(currentTab==='watermark'){
+    h=`<div class="sh">Marca de Agua</div>${tg('Activar','wmOn','var(--yellow)')}
+    ${a.wmOn?`<div style="margin-bottom:9px"><div style="font-size:11px;color:var(--text);margin-bottom:5px">Texto</div>
+    <input class="num-input" type="text" value="${a.wmText}" oninput="A().wmText=this.value;renderPreview()" style="width:100%"></div>
+    ${sld('Tamaño','wmSize',10,120,1,'px')}${sld('Opacidad','wmOpacity',5,100,1,'%')}
+    <div class="row2" style="align-items:center;margin-bottom:10px"><span style="font-size:11px;color:var(--text)">Color</span><input type="color" class="col-pick" value="${a.wmColor}" onchange="A().wmColor=this.value;renderPreview()"></div>
+    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Posición</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:10px">
+    ${[{id:'tl',l:'↖ Arr.Izq'},{id:'tr',l:'↗ Arr.Der'},{id:'c',l:'⊕ Centro'},{id:'bl',l:'↙ Aba.Izq'},{id:'br',l:'↘ Aba.Der'}].map(p=>`<button onclick="A().wmPos='${p.id}';renderToolPanel();renderPreview()" style="padding:6px 2px;background:${a.wmPos===p.id?'rgba(255,214,0,.2)':'var(--card)'};border:1px solid ${a.wmPos===p.id?'rgba(255,214,0,.5)':'var(--border)'};color:${a.wmPos===p.id?'var(--yellow)':'var(--muted)'};border-radius:5px;font-size:9px;cursor:pointer;font-family:'Syne',sans-serif">${p.l}</button>`).join('')}</div>`:''}`;
+  }
+  if(currentTab==='export'){
+    const ai=slots.filter(s=>s.img);
     h=`<div class="sh">Tamaño DTF</div>
-    <div class="preset-list">
-      ${PRESETS.map(p=>`<button class="preset-btn${expPreset===p.id?" on":""}" onclick="expPreset='${p.id}';renderToolPanel()">
-        <span>${p.label}</span>${p.w?`<small>${p.w}×${p.h}</small>`:""}
-      </button>`).join("")}
-    </div>
-    ${expPreset==="custom"?`<div class="row2">
-      <div style="flex:1"><div style="font-size:9px;color:var(--muted);margin-bottom:3px;font-family:'IBM Plex Mono',monospace">ANCHO px</div>
-      <input type="number" value="${customW}" oninput="customW=Number(this.value)" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px;font-size:11px;font-family:'IBM Plex Mono',monospace"></div>
-      <div style="flex:1"><div style="font-size:9px;color:var(--muted);margin-bottom:3px;font-family:'IBM Plex Mono',monospace">ALTO px</div>
-      <input type="number" value="${customH}" oninput="customH=Number(this.value)" style="width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px;font-size:11px;font-family:'IBM Plex Mono',monospace"></div>
-    </div>`:""}
-    <div class="sh" style="margin-top:10px">Formato</div>
-    <div class="fmt-btns">
-      ${["png","jpg","webp"].map(f=>`<button class="fmt-btn${expFmt===f?" on":""}" onclick="expFmt='${f}';renderToolPanel()">${f}</button>`).join("")}
-    </div>
-    ${expFmt==="png"?`<div class="info-box green">✅ PNG preserva transparencia — ideal DTF</div>`:""}
-    <button class="btn green full" onclick="doExport()" ${!S().img?"disabled":""}>
-      📥 Exportar imagen actual
-    </button>
-    ${activeImgs.length>1?`<button class="btn full" style="margin-top:8px;background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.4);color:var(--purple)" onclick="batchExport()">
-      📦 Exportar las ${activeImgs.length} imágenes
-    </button>`:""}
+    <div class="preset-list">${PRESETS.map(p=>`<button class="preset-btn${expPreset===p.id?' on':''}" onclick="expPreset='${p.id}';renderToolPanel();saveSettings()"><span>${p.label}</span>${p.w?`<small>${p.w}x${p.h}</small>`:''}</button>`).join('')}</div>
+    ${expPreset==='custom'?`<div class="row2"><div style="flex:1"><div class="sh">W px</div><input type="number" class="num-input" value="${customW}" oninput="customW=Number(this.value);saveSettings()"></div><div style="flex:1"><div class="sh">H px</div><input type="number" class="num-input" value="${customH}" oninput="customH=Number(this.value);saveSettings()"></div></div>`:''}
+    <div class="sh" style="margin-top:8px">Formato</div>
+    <div class="fmt-btns">${['png','jpg','webp'].map(f=>`<button class="fmt-btn${expFmt===f?' on':''}" onclick="expFmt='${f}';renderToolPanel();saveSettings()">${f}</button>`).join('')}</div>
+    ${expFmt==='png'?`<div class="info-box green">✅ PNG preserva transparencia — ideal DTF</div>`:''}
+    <button class="btn green full" onclick="doExport()" ${!S().img?'disabled':''}>📥 Exportar imagen actual</button>
+    ${ai.length>1?`<button class="btn purple full" style="margin-top:8px" onclick="batchExport()">📦 Exportar las ${ai.length} imágenes</button>`:''}
     <div id="output-area"></div>`;
   }
-
+  if(currentTab==='history'){
+    h=`<div class="sh">Historial</div>`;
+    if(!history.length){h+=`<div style="text-align:center;color:var(--muted);font-size:11px;margin-top:20px;line-height:1.8">Sin historial aún<br><span style="font-size:9px">Tus imágenes editadas aparecerán aquí</span></div>`}
+    else{
+      h+=`<div style="font-size:10px;color:var(--muted);margin-bottom:10px">Toca para recargar en un slot</div>`;
+      h+=history.map((item,i)=>`<div class="hist-item" onclick="loadFromHistory(${i})"><img class="hist-thumb" src="${item.src}"><div class="hist-info"><div>${item.name||'Imagen '+(i+1)}</div><small>${item.date}</small></div><span style="font-size:10px;color:var(--accent)">›</span></div>`).join('');
+      h+=`<button class="btn red full" style="margin-top:10px" onclick="history=[];localStorage.removeItem('dtf_hist_v1');renderToolPanel()">🗑 Limpiar historial</button>`;
+    }
+  }
   body.innerHTML=h;
 }
 
-function renderToolPanel2(key,val){
-  // Live update slider value labels
-  document.querySelectorAll(`[oninput*="'${key}'"]`).forEach(el=>{});
-}
+function addText(){const c=document.getElementById('tf-content')?.value?.trim();if(!c)return;tf.content=c;A().texts.push({...tf,id:'t'+Date.now(),content:c});activeTextId=A().texts[A().texts.length-1].id;tf.content='';saveSettings();renderToolPanel();renderPreview()}
+function removeText(id){A().texts=A().texts.filter(t=>t.id!==id);if(activeTextId===id)activeTextId=null;renderToolPanel();renderPreview()}
+function resetAdj(){const t=A().texts;slots[activeSlot].adj={brightness:100,contrast:100,saturation:100,hue:0,rotate:0,mirrorH:false,mirrorV:false,opacity:100,bgRemove:false,bgTol:35,bgTarget:'white',htOn:false,htSize:8,htSpacing:14,htAngle:45,htColor:'#000000',htMode:'dot',wmOn:false,wmText:'DTF Studio',wmOpacity:40,wmSize:28,wmColor:'#ffffff',wmPos:'br',texts:t};renderToolPanel();renderPreview()}
 
-// ── Text ────────────────────────────────────────────────────────────────────────
-function addText(){
-  const content=document.getElementById("tf-content")?.value?.trim();
-  if(!content)return;
-  tf.content=content;
-  const t={...tf, id:"t"+Date.now(), content};
-  A().texts.push(t);
-  activeTextId=t.id;
-  tf.content="";
-  renderToolPanel();
-  renderPreview();
-}
-function removeText(id){
-  A().texts=A().texts.filter(t=>t.id!==id);
-  if(activeTextId===id)activeTextId=null;
-  renderToolPanel();
-  renderPreview();
-}
-
-// ── Export ──────────────────────────────────────────────────────────────────────
-function getOutDims(s){
-  const p=PRESETS.find(p=>p.id===expPreset);
-  if(expPreset==="custom")return{w:customW,h:customH};
-  const ratio=s.img.naturalWidth/s.img.naturalHeight;
-  return ratio>=1?{w:p.w,h:Math.round(p.w/ratio)}:{w:Math.round(p.h*ratio),h:p.h};
-}
+function getOutDims(s){const p=PRESETS.find(p=>p.id===expPreset);if(expPreset==='custom')return{w:customW,h:customH};const r=s.img.naturalWidth/s.img.naturalHeight;return r>=1?{w:p.w,h:Math.round(p.w/r)}:{w:Math.round(p.h*r),h:p.h}}
 
 async function exportSlot(s){
-  const a=s.adj;
-  const dims=getOutDims(s);
-  const canvas=document.getElementById("export-canvas");
-  canvas.width=dims.w;canvas.height=dims.h;
-  const ctx=canvas.getContext("2d");
+  const a=s.adj,dims=getOutDims(s),ec=document.getElementById('export-canvas');
+  ec.width=dims.w;ec.height=dims.h;const ctx=ec.getContext('2d');
   ctx.clearRect(0,0,dims.w,dims.h);
-  if(expFmt!=="png"){ctx.fillStyle="#fff";ctx.fillRect(0,0,dims.w,dims.h);}
-  ctx.save();ctx.globalAlpha=a.opacity/100;
-  ctx.translate(dims.w/2,dims.h/2);
+  if(expFmt!=='png'){ctx.fillStyle='#fff';ctx.fillRect(0,0,dims.w,dims.h)}
+  ctx.save();ctx.globalAlpha=a.opacity/100;ctx.translate(dims.w/2,dims.h/2);
   if(a.rotate)ctx.rotate(a.rotate*Math.PI/180);
-  ctx.scale(a.mirrorH?-1:1,a.mirrorV?-1:1);
-  ctx.filter=buildFilter(a);
-  ctx.drawImage(s.img,-dims.w/2,-dims.h/2,dims.w,dims.h);
-  ctx.restore();
-  if(a.bgRemove)applyBgCanvas(canvas,a.bgTol,a.bgTarget);
-  if(a.htOn)applyHalfCanvas(canvas,a.htSize*(dims.w/500),a.htSpacing*(dims.w/500),a.htAngle,a.htColor,a.htMode);
-  a.texts.forEach(t=>{
-    ctx.save();ctx.font=`${t.bold?"bold ":""}${Math.round(t.size*(dims.w/500))}px ${t.font}`;
-    ctx.fillStyle=t.color;ctx.textAlign="center";ctx.textBaseline="middle";
-    const x=(t.x/100)*dims.w,y=(t.y/100)*dims.h;
-    if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size*(dims.w/500)/10;ctx.strokeText(t.content,x,y);}
-    ctx.fillText(t.content,x,y);ctx.restore();
-  });
-  const mime=expFmt==="png"?"image/png":expFmt==="jpg"?"image/jpeg":"image/webp";
-  return new Promise(res=>canvas.toBlob(blob=>{
-    const url=URL.createObjectURL(blob);
-    res({url,kb:Math.round(blob.size/1024),w:dims.w,h:dims.h});
-  },mime,expFmt==="png"?undefined:0.95));
+  ctx.scale(a.mirrorH?-1:1,a.mirrorV?-1:1);ctx.filter=bf(a);
+  ctx.drawImage(s.img,-dims.w/2,-dims.h/2,dims.w,dims.h);ctx.restore();
+  if(a.bgRemove)applyBg(ec,a.bgTol,a.bgTarget);
+  if(a.htOn)applyHT(ec,a.htSize*(dims.w/500),a.htSpacing*(dims.w/500),a.htAngle,a.htColor,a.htMode);
+  if(a.wmOn)drawWM(ctx,a,dims.w,dims.h);
+  a.texts.forEach(t=>{ctx.save();ctx.font=`${t.bold?'bold ':''}${Math.round(t.size*(dims.w/500))}px ${t.font}`;ctx.fillStyle=t.color;ctx.textAlign='center';ctx.textBaseline='middle';const x=(t.x/100)*dims.w,y=(t.y/100)*dims.h;if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size*(dims.w/500)/10;ctx.strokeText(t.content,x,y)}ctx.fillText(t.content,x,y);ctx.restore()});
+  const mime=expFmt==='png'?'image/png':expFmt==='jpg'?'image/jpeg':'image/webp';
+  return new Promise(res=>ec.toBlob(b=>res({url:URL.createObjectURL(b),kb:Math.round(b.size/1024),w:dims.w,h:dims.h}),mime,expFmt==='png'?undefined:.95));
 }
 
 async function doExport(){
-  if(!S().img)return;
-  const out=document.getElementById("output-area");
+  if(!S().img)return;const out=document.getElementById('output-area');
   out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Procesando...</div>`;
   await new Promise(r=>setTimeout(r,50));
   const res=await exportSlot(S());
-  out.innerHTML=`<div class="output-card">
-    <h4>✅ ${LABELS[activeSlot]} lista</h4>
-    <code>${res.w}×${res.h}px · ${res.kb} KB · .${expFmt.toUpperCase()}</code>
-    <a class="dl-btn" href="${res.url}" download="dtf_${LABELS[activeSlot].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a>
-  </div>`;
+  out.innerHTML=`<div class="output-card"><h4>✅ ${LABELS[activeSlot]} lista</h4><code>${res.w}x${res.h}px · ${res.kb} KB · .${expFmt.toUpperCase()}</code><a class="dl-btn" href="${res.url}" download="dtf_${LABELS[activeSlot].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a></div>`;
 }
 
 async function batchExport(){
-  const active=slots.filter(s=>s.img);
-  const out=document.getElementById("output-area");
-  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Exportando ${active.length} imágenes...</div>`;
+  const active=slots.filter(s=>s.img),out=document.getElementById('output-area');
+  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Exportando ${active.length} imgs...</div>`;
   await new Promise(r=>setTimeout(r,50));
-  let html=`<div style="margin-top:12px">`;
-  for(const s of active){
-    const res=await exportSlot(s);
-    html+=`<div class="output-card">
-      <h4 style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:${COLORS[s.id]};display:inline-block"></span>✅ ${LABELS[s.id]}</h4>
-      <code>${res.w}×${res.h}px · ${res.kb} KB</code>
-      <a class="dl-btn" href="${res.url}" download="dtf_${LABELS[s.id].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a>
-    </div>`;
-  }
-  html+="</div>";
-  out.innerHTML=html;
+  let html='<div style="margin-top:12px">';
+  for(const s of active){const res=await exportSlot(s);html+=`<div class="output-card"><h4 style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:${COLORS[s.id]};display:inline-block"></span>✅ ${LABELS[s.id]}</h4><code>${res.w}x${res.h}px · ${res.kb} KB</code><a class="dl-btn" href="${res.url}" download="dtf_${LABELS[s.id].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a></div>`}
+  out.innerHTML=html+'</div>';
 }
 
-// ── Adjustments reset ──────────────────────────────────────────────────────────
-function resetAdj(){
-  const t=A().texts;
-  slots[activeSlot].adj={brightness:100,contrast:100,saturation:100,hue:0,rotate:0,
-    mirrorH:false,mirrorV:false,opacity:100,bgRemove:false,bgTol:35,bgTarget:"white",
-    htOn:false,htSize:6,htSpacing:10,htAngle:45,htColor:"#000000",htMode:"dot",texts:t};
-  renderToolPanel();renderPreview();
-}
+function refresh(){renderSlotsBar();renderPreview();renderToolPanel();document.getElementById('mh-btn')?.classList.toggle('on',A().mirrorH);document.getElementById('mv-btn')?.classList.toggle('on',A().mirrorV);saveSettings()}
 
-// ── Full Refresh ───────────────────────────────────────────────────────────────
-function refresh(){
-  renderSlotsBar();
-  renderPreview();
-  renderToolPanel();
-  const mhBtn=document.getElementById("mh-btn");
-  const mvBtn=document.getElementById("mv-btn");
-  if(mhBtn)mhBtn.classList.toggle("on",A().mirrorH);
-  if(mvBtn)mvBtn.classList.toggle("on",A().mirrorV);
-}
-
-// ── PWA Install ────────────────────────────────────────────────────────────────
-window.addEventListener("beforeinstallprompt", e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  document.getElementById("install-banner").classList.add("show");
-  document.getElementById("install-btn").onclick = async () => {
-    document.getElementById("install-banner").classList.remove("show");
-    deferredPrompt.prompt();
-    const result = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-  };
-});
-
-window.addEventListener("appinstalled", () => {
-  document.getElementById("install-banner").classList.remove("show");
-});
-
-// iOS detection
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
-if (isIOS && !isStandalone) {
-  setTimeout(() => document.getElementById("ios-hint").classList.add("show"), 2500);
-}
-
-// ── Service Worker ─────────────────────────────────────────────────────────────
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').classList.add('show');document.getElementById('install-btn').onclick=async()=>{document.getElementById('install-banner').classList.remove('show');deferredPrompt.prompt();deferredPrompt=null}});
+window.addEventListener('appinstalled',()=>document.getElementById('install-banner').classList.remove('show'));
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 refresh();
 </script>
 </body>
