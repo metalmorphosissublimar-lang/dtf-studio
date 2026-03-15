@@ -106,7 +106,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
   #panel-overlay.show{display:block}
   #toggle-panel-btn{display:flex!important}
 }
-#toggle-panel-btn{display:none}
+#toggle-panel-btn{background:linear-gradient(135deg,rgba(168,85,247,.25),rgba(0,200,255,.15));border:1px solid rgba(168,85,247,.5);color:var(--purple);border-radius:9px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;margin-left:6px;display:flex;align-items:center;gap:5px}
 .tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;background:rgba(7,9,14,.5)}
 .tab{flex-shrink:0;padding:11px 8px;font-size:10px;font-weight:700;cursor:pointer;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);transition:all .18s;font-family:'Syne',sans-serif;white-space:nowrap}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
@@ -206,8 +206,8 @@ input[type=color].col-pick{width:36px;height:32px;border-radius:8px;border:1px s
   <div id="header">
     <div class="logo-icon">🎨</div>
     <div><div class="logo-name">DTF Studio Pro</div><div class="logo-sub">SIN FONDO · DTF · SUBLIMACIÓN</div></div>
-    <button class="btn sm sub" style="margin-left:auto" onclick="openPicker(-1)">📁 Abrir</button>
-    <button class="btn sm purple" id="toggle-panel-btn" onclick="togglePanel()">⚙</button>
+    <button class="btn sm sub" style="margin-left:auto" onclick="triggerLoadAll()">📁 Cargar 5</button>
+    <button class="btn sm purple" id="toggle-panel-btn" onclick="togglePanel()">⚙ Config</button>
   </div>
 
   <!-- Image slots -->
@@ -266,6 +266,11 @@ input[type=color].col-pick{width:36px;height:32px;border-radius:8px;border:1px s
       <div style="font-size:16px;font-weight:800;margin-bottom:3px">Seleccionar Imagen</div>
       <div style="font-size:10px;color:var(--muted)" id="picker-lbl">Elige la fuente</div>
     </div>
+    <button class="picker-source" onclick="closePicker();triggerLoadAll()" style="background:rgba(0,230,118,.08);border-color:rgba(0,230,118,.4);margin-bottom:9px">
+      <div class="picker-source-icon" style="background:rgba(0,230,118,.15)">📦</div>
+      <div><div class="picker-source-title" style="color:var(--green)">Cargar 5 imágenes a la vez</div><div class="picker-source-sub">Selecciona hasta 5 fotos de una sola vez</div></div>
+      <span style="margin-left:auto;color:var(--green);font-size:20px">›</span>
+    </button>
     <button class="picker-source" onclick="triggerGallery()" style="border-color:rgba(0,200,255,.3)">
       <div class="picker-source-icon" style="background:rgba(0,200,255,.1)">🖼️</div>
       <div><div class="picker-source-title">Galería / Archivos</div><div class="picker-source-sub">JPG · PNG · WEBP · GIF</div></div>
@@ -280,6 +285,7 @@ input[type=color].col-pick{width:36px;height:32px;border-radius:8px;border:1px s
     <button class="picker-cancel" onclick="closePicker()">Cancelar</button>
     <input id="file-gallery" type="file" accept="image/*" multiple style="display:none" onchange="onFilePicked(event)"/>
     <input id="file-camera" type="file" accept="image/*" capture="environment" style="display:none" onchange="onFilePicked(event)"/>
+    <input id="file-all" type="file" accept="image/*" multiple style="display:none" onchange="onLoadAll(event)"/>
   </div>
 </div>
 
@@ -700,6 +706,32 @@ function addHistory(src,name){history.unshift({src,name,date:new Date().toLocale
 function loadHistory(idx){const item=history[idx];if(!item)return;const ni=new Image();ni.onload=()=>{imgs[activeIdx].img=ni;imgs[activeIdx].src=item.src;renderSlide(activeIdx);renderSlots();updateLabel()};ni.src=item.src}
 
 // ── Picker ────────────────────────────────────────────────────────────────────
+function triggerLoadAll(){document.getElementById('file-all').click()}
+
+function onLoadAll(e){
+  const files=Array.from(e.target.files).slice(0,MAX);
+  if(!files.length)return;
+  let loaded=0;
+  files.forEach((f,fi)=>{
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      const src=ev.target.result;const ni=new Image();
+      ni.onload=()=>{
+        imgs[fi].img=ni;imgs[fi].src=src;
+        addHistory(src,f.name.replace(/\.[^.]+$/,''));
+        loaded++;
+        if(loaded===files.length){
+          goToSlide(0);
+          showToast(`✅ ${files.length} imágenes cargadas — desliza para ver cada una`,COLORS[0]);
+        } else {
+          renderSlots();
+        }
+      };ni.src=src;
+    };rd.readAsDataURL(f);
+  });
+  e.target.value='';
+}
+
 function openPicker(t){pickerTarget=t!==-1?t:imgs.findIndex(i=>!i.img);if(pickerTarget===-1)pickerTarget=0;document.getElementById('picker-lbl').textContent=`Cargando en ${IMGNAMES[pickerTarget]}`;document.getElementById('picker-modal').classList.add('show')}
 function closePicker(){document.getElementById('picker-modal').classList.remove('show')}
 function triggerGallery(){document.getElementById('file-gallery').click()}
@@ -715,8 +747,14 @@ function onFilePicked(e){
 function clearImg(idx){imgs[idx].img=null;imgs[idx].src=null;if(activeIdx===idx){const ni=imgs.findIndex(i=>i.img);goToSlide(ni===-1?0:ni)}else{renderSlots()};saveAll()}
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
-function switchTab(id){currentTab=id;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));document.getElementById('tab-'+id).classList.add('on');renderPanel()}
-function togglePanel(){document.getElementById('right-panel').classList.toggle('open');document.getElementById('panel-overlay').classList.toggle('show')}
+function switchTab(id){currentTab=id;document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));const el=document.getElementById('tab-'+id);if(el)el.classList.add('on');renderPanel()}
+function togglePanel(){
+  const p=document.getElementById('right-panel');
+  const o=document.getElementById('panel-overlay');
+  const isOpen=p.classList.contains('open');
+  if(isOpen){p.classList.remove('open');o.classList.remove('show')}
+  else{p.classList.add('open');o.classList.add('show')}
+}
 
 function SH(label,color){return`<div class="sh" style="border-left:2px solid ${color||'var(--accent)'};padding-left:7px"><span>${label}</span><div class="sh-line"></div></div>`}
 function sld(label,key,min,max,step,unit){
