@@ -33,6 +33,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;heigh
 #open-btn{margin-left:auto;background:linear-gradient(135deg,rgba(0,200,255,.2),rgba(255,79,31,.15));border:1px solid rgba(0,200,255,.4);color:var(--accent);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;display:flex;align-items:center;gap:5px}
 #toggle-panel-btn{display:none;background:linear-gradient(135deg,rgba(168,85,247,.25),rgba(0,200,255,.15));border:1px solid rgba(168,85,247,.5);color:var(--purple);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Syne',sans-serif;margin-left:6px}
 #slots-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 10px;display:flex;gap:7px;overflow-x:auto;flex-shrink:0}
+#layer-bar{background:#0C1018;border-bottom:1px solid var(--border);padding:6px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;flex-shrink:0;min-height:42px}
+.layer-chip{display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer;flex-shrink:0;transition:all .15s}
+.layer-chip.active{border-color:var(--accent);background:rgba(0,200,255,.1)}
+.layer-chip-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.layer-chip-name{font-size:9px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
+.layer-chip.active .layer-chip-name{color:var(--accent)}
+.layer-order-btns{display:flex;gap:3px;margin-left:2px}
+.layer-order-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer;line-height:1;flex-shrink:0}
+.layer-order-btn:active{background:rgba(0,200,255,.15);color:var(--accent)}
+.layer-blend{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 5px;font-size:9px;font-family:'IBM Plex Mono',monospace;cursor:pointer;flex-shrink:0}
+.layer-opacity-mini{width:60px;height:3px;border-radius:2px;background:var(--border);flex-shrink:0;cursor:pointer;-webkit-appearance:none;outline:none}
+.layer-opacity-mini::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer}
+.layer-label-sm{font-size:8px;color:var(--muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0}
 .slot{flex-shrink:0;width:58px;height:58px;border-radius:10px;border:2px solid var(--border);cursor:pointer;position:relative;overflow:hidden;transition:all .2s;background:var(--card);display:flex;align-items:center;justify-content:center}
 .slot img{width:100%;height:100%;object-fit:cover}
 .slot-empty{display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -161,6 +174,7 @@ input.num-input{background:var(--card);border:1px solid var(--border);color:var(
   <button id="toggle-panel-btn" onclick="togglePanel()">⚙ Config</button>
 </div>
 <div id="slots-bar"></div>
+<div id="layer-bar"></div>
 <div id="main">
   <div id="canvas-area">
     <div id="canvas-toolbar">
@@ -255,6 +269,7 @@ input.num-input{background:var(--card);border:1px solid var(--border);color:var(
 
 <script>
 const MAX=5,COLORS=['#00C8FF','#FF4F1F','#00E676','#FFD600','#A855F7'],LABELS=['IMG 1','IMG 2','IMG 3','IMG 4','IMG 5'];
+const BLENDS=['normal','multiply','screen','overlay','darken','lighten'];
 const PRESETS=[{id:'a4',label:'A4 300dpi',w:2480,h:3508},{id:'a3',label:'A3 300dpi',w:3508,h:4961},{id:'shirt',label:'Camisa 12x12"',w:3543,h:3543},{id:'mug',label:'Taza 20x8 cm',w:2362,h:945},{id:'custom',label:'Personalizado',w:0,h:0}];
 
 // Sub positions for auto-position sublimation
@@ -285,7 +300,8 @@ let applyGlobalToAll=sv.applyGlobalToAll!==undefined?sv.applyGlobalToAll:true;
 let subPosition=sv.subPosition||'shirt_front';
 
 // Per-image state (rotate/mirror/opacity/texts stay per-image)
-let slots=Array.from({length:MAX},(_,i)=>({id:i,img:null,src:null,rotate:0,mirrorH:false,mirrorV:false,opacity:100,texts:[]}));
+let slots=Array.from({length:MAX},(_,i)=>({id:i,img:null,src:null,rotate:0,mirrorH:false,mirrorV:false,opacity:100,blend:'normal',texts:[]}));
+let layerOrder=[0,1,2,3,4]; // index 0 = bottom, index 4 = top
 let activeSlot=0,currentTab='config',pickerTarget=0;
 let cropMode=false,cropRect=null,cropDrag=false,cropStart=null,activeTextId=null,deferredPrompt=null;
 let history=[];try{history=JSON.parse(localStorage.getItem('dtf_hist_v1'))||[]}catch{}
@@ -347,30 +363,115 @@ function renderSlotsBar(){
     else{const em=document.createElement('div');em.className='slot-empty';em.innerHTML=`<span>+</span><small>${LABELS[i]}</small>`;d.appendChild(em)}
     d.appendChild(n);d.onclick=()=>{if(s.img){activeSlot=i;refresh()}else openPicker(i)};bar.appendChild(d);
   });
+  renderLayerBar();
+}
+
+function renderLayerBar(){
+  const bar=document.getElementById('layer-bar');
+  const visLayers=layerOrder.filter(i=>slots[i].img);
+  if(!visLayers.length){bar.innerHTML='<span style="font-size:10px;color:var(--muted);font-family:\'IBM Plex Mono\',monospace">Sin capas — carga imágenes arriba</span>';return}
+  bar.innerHTML='';
+  // Label
+  const lbl=document.createElement('span');lbl.className='layer-label-sm';lbl.textContent='CAPAS:';bar.appendChild(lbl);
+  // Layer chips from TOP to BOTTOM (reversed for display)
+  [...visLayers].reverse().forEach((slotIdx,dispIdx)=>{
+    const s=slots[slotIdx];
+    const chip=document.createElement('div');chip.className='layer-chip'+(slotIdx===activeSlot?' active':'');
+    chip.style.borderColor=slotIdx===activeSlot?COLORS[slotIdx]:'var(--border)';
+    const dot=document.createElement('div');dot.className='layer-chip-dot';dot.style.background=COLORS[slotIdx];
+    const name=document.createElement('span');name.className='layer-chip-name';
+    const posInOrder=layerOrder.indexOf(slotIdx);
+    const posLabel=posInOrder===layerOrder.filter(i=>slots[i].img).length-1?'▲TOP':posInOrder===0?'▼BOT':`#${posInOrder+1}`;
+    name.textContent=`${LABELS[slotIdx]} ${posLabel}`;
+    chip.appendChild(dot);chip.appendChild(name);
+    chip.onclick=()=>{activeSlot=slotIdx;renderSlotsBar();renderPreview();renderToolPanel()};
+    bar.appendChild(chip);
+  });
+  // Separator
+  const sep=document.createElement('div');sep.style.cssText='width:1px;height:24px;background:var(--border);flex-shrink:0;margin:0 4px';bar.appendChild(sep);
+  // Order controls for active slot
+  const activeInOrder=layerOrder.indexOf(activeSlot);
+  const maxPos=layerOrder.filter(i=>slots[i].img).length-1;
+  const upBtn=document.createElement('button');upBtn.className='layer-order-btn';upBtn.title='Subir capa';
+  upBtn.innerHTML='▲';upBtn.disabled=activeInOrder>=maxPos;
+  upBtn.style.opacity=activeInOrder>=maxPos?'.3':'1';
+  upBtn.onclick=()=>moveLayer(activeSlot,1);
+  const downBtn=document.createElement('button');downBtn.className='layer-order-btn';downBtn.title='Bajar capa';
+  downBtn.innerHTML='▼';downBtn.disabled=activeInOrder<=0;
+  downBtn.style.opacity=activeInOrder<=0?'.3':'1';
+  downBtn.onclick=()=>moveLayer(activeSlot,-1);
+  const topBtn=document.createElement('button');topBtn.className='layer-order-btn';topBtn.title='Al frente';
+  topBtn.innerHTML='⬆';topBtn.style.opacity=activeInOrder>=maxPos?'.3':'1';
+  topBtn.onclick=()=>moveLayerToTop(activeSlot);
+  const botBtn=document.createElement('button');botBtn.className='layer-order-btn';botBtn.title='Al fondo';
+  botBtn.innerHTML='⬇';botBtn.style.opacity=activeInOrder<=0?'.3':'1';
+  botBtn.onclick=()=>moveLayerToBottom(activeSlot);
+  // Blend mode
+  const blend=document.createElement('select');blend.className='layer-blend';
+  BLENDS.forEach(b=>{const o=document.createElement('option');o.value=b;o.textContent=b;o.selected=slots[activeSlot].blend===b;blend.appendChild(o)});
+  blend.onchange=()=>{slots[activeSlot].blend=blend.value;renderPreview()};
+  // Opacity mini slider
+  const opLbl=document.createElement('span');opLbl.className='layer-label-sm';opLbl.textContent='OP:';
+  const opSlider=document.createElement('input');opSlider.type='range';opSlider.min=5;opSlider.max=100;opSlider.value=slots[activeSlot].opacity;opSlider.className='layer-opacity-mini';
+  opSlider.oninput=()=>{slots[activeSlot].opacity=Number(opSlider.value);renderPreview()};
+  const orderGroup=document.createElement('div');orderGroup.className='layer-order-btns';
+  orderGroup.appendChild(upBtn);orderGroup.appendChild(downBtn);orderGroup.appendChild(topBtn);orderGroup.appendChild(botBtn);
+  bar.appendChild(orderGroup);bar.appendChild(blend);bar.appendChild(opLbl);bar.appendChild(opSlider);
+}
+
+function moveLayer(slotIdx, dir){
+  const pos=layerOrder.indexOf(slotIdx);
+  const newPos=pos+dir;
+  if(newPos<0||newPos>=MAX)return;
+  const tmp=layerOrder[pos];layerOrder[pos]=layerOrder[newPos];layerOrder[newPos]=tmp;
+  renderSlotsBar();renderPreview();
+}
+function moveLayerToTop(slotIdx){
+  layerOrder=layerOrder.filter(i=>i!==slotIdx);layerOrder.push(slotIdx);
+  renderSlotsBar();renderPreview();
+}
+function moveLayerToBottom(slotIdx){
+  layerOrder=layerOrder.filter(i=>i!==slotIdx);layerOrder.unshift(slotIdx);
+  renderSlotsBar();renderPreview();
 }
 
 // ── Render Preview ────────────────────────────────────────────────────────────
 function bf(){const g=GA();return`brightness(${g.brightness}%) contrast(${g.contrast}%) saturate(${g.saturation}%) hue-rotate(${g.hue}deg)`}
 
 function renderPreview(){
-  const cv=document.getElementById('preview'),em=document.getElementById('empty-state'),s=S();
-  if(!s.img){cv.style.display='none';em.style.display='block';return}
+  const cv=document.getElementById('preview'),em=document.getElementById('empty-state');
+  const visLayers=layerOrder.filter(i=>slots[i].img);
+  if(!visLayers.length){cv.style.display='none';em.style.display='block';return}
   cv.style.display='block';em.style.display='none';
   const wrap=document.getElementById('canvas-wrap');
   const mw=wrap.clientWidth-28,mh=wrap.clientHeight-28;
-  const sc=Math.min(mw/s.img.naturalWidth,mh/s.img.naturalHeight,1);
-  const cw=Math.round(s.img.naturalWidth*sc),ch=Math.round(s.img.naturalHeight*sc);
+  // Use first loaded image for dimensions
+  const baseSlot=slots[visLayers[0]];
+  const sc=Math.min(mw/baseSlot.img.naturalWidth,mh/baseSlot.img.naturalHeight,1);
+  const cw=Math.round(baseSlot.img.naturalWidth*sc),ch=Math.round(baseSlot.img.naturalHeight*sc);
   cv.width=cw;cv.height=ch;
   const ctx=cv.getContext('2d'),g=GA();
   ctx.clearRect(0,0,cw,ch);
-  ctx.save();ctx.globalAlpha=s.opacity/100;ctx.translate(cw/2,ch/2);
-  if(s.rotate)ctx.rotate(s.rotate*Math.PI/180);
-  ctx.scale(s.mirrorH?-1:1,s.mirrorV?-1:1);ctx.filter=bf();
-  ctx.drawImage(s.img,-cw/2,-ch/2,cw,ch);ctx.restore();
+  // Draw all layers bottom to top
+  visLayers.forEach(slotIdx=>{
+    const s=slots[slotIdx];
+    ctx.save();
+    ctx.globalAlpha=s.opacity/100;
+    ctx.globalCompositeOperation=s.blend||'source-over';
+    ctx.translate(cw/2,ch/2);
+    if(s.rotate)ctx.rotate(s.rotate*Math.PI/180);
+    ctx.scale(s.mirrorH?-1:1,s.mirrorV?-1:1);
+    ctx.filter=`brightness(${g.brightness}%) contrast(${g.contrast}%) saturate(${g.saturation}%) hue-rotate(${g.hue}deg)`;
+    ctx.drawImage(s.img,-cw/2,-ch/2,cw,ch);
+    ctx.restore();
+  });
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.filter='none';
   if(g.bgRemove)applyBg(cv,g.bgTol,g.bgTarget);
   if(g.htOn)applyHT(cv,g.htSize,g.htSpacing,g.htAngle,g.htColor,g.htMode);
   if(g.wmOn)drawWM(ctx,g,cw,ch);
-  s.texts.forEach(t=>drawTxt(ctx,t,cw,ch,t.id===activeTextId));
+  // Draw texts for active slot on top
+  const s=slots[activeSlot];
+  if(s.texts)s.texts.forEach(t=>drawTxt(ctx,t,cw,ch,t.id===activeTextId));
   if(cropMode&&cropRect)drawCropOvl(ctx,cropRect,cw,ch);
 }
 
@@ -490,7 +591,115 @@ function applyResize(){
   ni.src=tmp.toDataURL();document.getElementById('resize-modal').classList.remove('show');
 }
 
-// ── AI BG Remove ──────────────────────────────────────────────────────────────
+// ── Smart Auto Halftone ───────────────────────────────────────────────────────
+function analyzeImageForHalftone(){
+  const s=S();if(!s.img)return null;
+  const tmp=document.createElement('canvas');
+  const maxSz=80;// sample at low res for speed
+  const sc=Math.min(maxSz/s.img.naturalWidth,maxSz/s.img.naturalHeight,1);
+  tmp.width=Math.round(s.img.naturalWidth*sc);tmp.height=Math.round(s.img.naturalHeight*sc);
+  const ctx=tmp.getContext('2d');ctx.drawImage(s.img,0,0,tmp.width,tmp.height);
+  const id=ctx.getImageData(0,0,tmp.width,tmp.height);const d=id.data;
+  let rSum=0,gSum=0,bSum=0,count=0,darkPx=0,brightPx=0,colorfulPx=0;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<20)continue;
+    const r=d[i],g=d[i+1],b=d[i+2];
+    rSum+=r;gSum+=g;bSum+=b;count++;
+    const bright=(r+g+b)/3;
+    const sat=Math.max(r,g,b)-Math.min(r,g,b);
+    if(bright<80)darkPx++;
+    if(bright>180)brightPx++;
+    if(sat>60)colorfulPx++;
+  }
+  if(!count)return null;
+  const avgR=rSum/count,avgG=gSum/count,avgB=bSum/count;
+  const avgBright=(avgR+avgG+avgB)/3;
+  const darkRatio=darkPx/count,brightRatio=brightPx/count,colorRatio=colorfulPx/count;
+  return{avgR,avgG,avgB,avgBright,darkRatio,brightRatio,colorRatio,count};
+}
+
+function getComplementaryColor(r,g,b){
+  // Convert to HSL, rotate hue 180°
+  const nr=r/255,ng=g/255,nb=b/255;
+  const max=Math.max(nr,ng,nb),min=Math.min(nr,ng,nb);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0}else{
+    const d=max-min;s=l>.5?d/(2-max-min):d/(max+min);
+    if(max===nr)h=((ng-nb)/d+(ng<nb?6:0))/6;
+    else if(max===ng)h=((nb-nr)/d+2)/6;
+    else h=((nr-ng)/d+4)/6;
+  }
+  h=(h+.5)%1;
+  // Back to RGB
+  function hue2rgb(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p}
+  if(s===0){const v=Math.round(l*255);return`rgb(${v},${v},${v})`}
+  const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+  const cr=Math.round(hue2rgb(p,q,h+1/3)*255);
+  const cg=Math.round(hue2rgb(p,q,h)*255);
+  const cb=Math.round(hue2rgb(p,q,h-1/3)*255);
+  return`rgb(${cr},${cg},${cb})`,{r:cr,g:cg,b:cb};
+}
+
+function autoHalftone(){
+  if(!S().img){alert('Primero carga una imagen');return}
+  const a=analyzeImageForHalftone();if(!a)return;
+  const g=GA();
+  let htColor,htMode,htSize,htSpacing,htAngle,reason;
+
+  // Decision logic based on image analysis
+  if(a.brightRatio>0.6){
+    // Mostly bright/white image → dark dots work best
+    htColor='#1a1a1a';htMode='dot';htSize=7;htSpacing=12;htAngle=45;
+    reason='Imagen clara → puntos oscuros para contraste';
+  } else if(a.darkRatio>0.6){
+    // Mostly dark image → light/white dots
+    htColor='#f0f0f0';htMode='dot';htSize=6;htSpacing=11;htAngle=45;
+    reason='Imagen oscura → puntos claros para visibilidad';
+  } else if(a.colorRatio>0.5){
+    // Colorful image → use complementary color of dominant hue
+    const comp=getComplementaryColor(a.avgR,a.avgG,a.avgB);
+    if(typeof comp==='object'){
+      htColor=`rgb(${comp.r},${comp.g},${comp.b})`;
+    } else {
+      // Fallback: use dark
+      htColor='#111111';
+    }
+    htMode='dot';htSize=8;htSpacing=13;htAngle=30;
+    reason='Imagen colorida → color complementario al tono dominante';
+  } else if(a.avgBright>160){
+    // Light pastel → medium gray dots
+    htColor='#444444';htMode='dot';htSize=6;htSpacing=12;htAngle=45;
+    reason='Tonos suaves → gris medio para suavidad';
+  } else if(a.avgBright<80){
+    // Very dark → white cross for dramatic effect
+    htColor='#ffffff';htMode='cross';htSize=5;htSpacing=10;htAngle=45;
+    reason='Imagen muy oscura → cruces blancas dramáticas';
+  } else {
+    // Mixed/neutral → black dots classic
+    htColor='#000000';htMode='dot';htSize=7;htSpacing=12;htAngle=45;
+    reason='Imagen mixta → semitono clásico negro';
+  }
+
+  // Adjust size/spacing based on image content
+  if(a.colorRatio>0.7){htSize=Math.min(htSize+1,12);htSpacing=Math.min(htSpacing+2,18)}
+  if(a.darkRatio>0.8){htSize=Math.max(htSize-1,3);htSpacing=Math.max(htSpacing-2,7)}
+
+  // Apply
+  g.htOn=true;g.htColor=htColor;g.htMode=htMode;
+  g.htSize=htSize;g.htSpacing=htSpacing;g.htAngle=htAngle;
+  saveAll();renderToolPanel();renderPreview();
+
+  // Show result toast
+  const avgHex=`#${Math.round(a.avgR).toString(16).padStart(2,'0')}${Math.round(a.avgG).toString(16).padStart(2,'0')}${Math.round(a.avgB).toString(16).padStart(2,'0')}`;
+  showAutoToast(`🎨 Auto semitono: ${reason}`,htColor);
+}
+
+function showAutoToast(msg,color){
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid ${color||'var(--accent)'};color:var(--text);padding:10px 16px;border-radius:10px;font-size:11px;font-weight:600;font-family:'Syne',sans-serif;z-index:999;animation:fadeUp .3s ease;max-width:90vw;text-align:center;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,.5)`;
+  t.innerHTML=`${msg}<br><span style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace">Puedes ajustar manualmente abajo</span>`;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),4000);
+}
 async function removeBackgroundAI(){
   if(!S().img){alert('Primero carga una imagen');return}
   document.getElementById('ai-overlay').classList.add('show');
@@ -584,7 +793,15 @@ function renderToolPanel(){
     </div>
     <button class="btn sub full" onclick="autoSubPosition()">🖨 Aplicar Posición Sublimación</button>
 
-    <button class="btn muted full" style="margin-top:10px" onclick="resetGlobal()">↩ Restablecer ajustes</button>`;
+    <button class="btn muted full" style="margin-top:10px" onclick="resetGlobal()">↩ Restablecer ajustes</button>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+    <div class="sh" style="border-color:var(--purple)">⚡ Accesos Rápidos</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
+      <button class="btn purple" style="flex:1;font-size:10px" onclick="switchTab('halftone');autoHalftone()">🤖 Auto Semitono</button>
+      <button class="btn" style="flex:1;font-size:10px;border-color:rgba(168,85,247,.4);color:var(--purple)" onclick="removeBackgroundAI()">🧹 IA Fondo</button>
+      <button class="btn sub" style="flex:1;font-size:10px" onclick="autoSubPosition()">🖨 Sub Auto</button>
+    </div>
+    </div>`;
   }
 
   // ── CROP ──
@@ -615,14 +832,31 @@ function renderToolPanel(){
   // ── HALFTONE ──
   if(currentTab==='halftone'){
     h=`<div class="sh">Semitono <span class="global-badge">todas</span></div>
+
+    <button class="btn full" onclick="autoHalftone()" style="background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(0,200,255,.15));border-color:rgba(168,85,247,.5);color:var(--purple);margin-bottom:12px;padding:11px">
+      🤖 Auto Semitono Inteligente
+    </button>
+    <div class="info-box blue" style="margin-bottom:10px">Analiza los colores de tu imagen y elige automáticamente el tipo de punto, tamaño y color más adecuado.</div>
+
     ${tg('Activar Semitono','htOn')}
-    ${g.htOn?`<div style="font-size:11px;color:var(--text);margin-bottom:7px">Forma</div>
+    ${g.htOn?`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:11px;color:var(--text)">Color actual</span>
+      <div style="width:20px;height:20px;border-radius:50%;background:${g.htColor};border:2px solid var(--border);flex-shrink:0"></div>
+      <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">${g.htColor}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Forma del Punto</div>
     <div class="shape-btns">${[{id:'dot',l:'● Punto'},{id:'line',l:'| Línea'},{id:'cross',l:'+ Cruz'}].map(m=>`<div class="shape-btn${g.htMode===m.id?' on':''}" onclick="GA().htMode='${m.id}';renderToolPanel();renderPreview();saveAll()">${m.l}</div>`).join('')}</div>
-    ${sld('Tamaño punto','htSize',2,28,1,'px')}${sld('Espaciado','htSpacing',4,50,1,'px')}${sld('Ángulo','htAngle',0,90,1,'°')}
-    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Color del punto</div>
-    <div class="ht-colors">${['#000000','#FF4F1F','#00C8FF','#FFD600','#ffffff','#ff00ff'].map(c=>`<div class="ht-col${g.htColor===c?' on':''}" style="background:${c};${c==='#ffffff'?'border-color:#555':''}" onclick="GA().htColor='${c}';renderToolPanel();renderPreview();saveAll()"></div>`).join('')}
-    <input type="color" class="col-pick" value="${g.htColor}" onchange="GA().htColor=this.value;renderPreview();saveAll()" style="width:24px;height:24px;border-radius:50%;padding:1px"></div>
-    <div class="info-box blue">💡 Efecto vintage/artístico para impresión DTF.</div>`:''}`;
+    ${sld('Tamaño punto','htSize',2,28,1,'px')}
+    ${sld('Espaciado','htSpacing',4,50,1,'px')}
+    ${sld('Ángulo','htAngle',0,90,1,'°')}
+    <div style="font-size:11px;color:var(--text);margin-bottom:7px">Color Manual</div>
+    <div class="ht-colors">
+      ${['#000000','#1a1a1a','#444444','#888888','#ffffff','#FF4F1F','#00C8FF','#FFD600','#ff00ff','#00E676'].map(c=>`<div class="ht-col${g.htColor===c?' on':''}" style="background:${c};${c==='#ffffff'||c==='#f0f0f0'?'border-color:#555':''}" onclick="GA().htColor='${c}';renderToolPanel();renderPreview();saveAll()"></div>`).join('')}
+      <input type="color" class="col-pick" value="${g.htColor}" onchange="GA().htColor=this.value;renderToolPanel();renderPreview();saveAll()" style="width:24px;height:24px;border-radius:50%;padding:1px">
+    </div>
+    <button class="btn muted full" style="margin-top:6px" onclick="autoHalftone()">🔄 Recalcular Auto</button>
+    `:''}`;
   }
 
   // ── BG ──
@@ -684,39 +918,57 @@ function resetGlobal(){globalAdj={brightness:100,contrast:100,saturation:100,hue
 // ── Export ────────────────────────────────────────────────────────────────────
 function getOutDims(s){const p=PRESETS.find(p=>p.id===expPreset);if(expPreset==='custom')return{w:customW,h:customH};const r=s.img.naturalWidth/s.img.naturalHeight;return r>=1?{w:p.w,h:Math.round(p.w/r)}:{w:Math.round(p.h*r),h:p.h}}
 
-async function exportSlot(s){
-  const g=GA(),dims=getOutDims(s),ec=document.getElementById('export-canvas');
+async function exportSlot(targetSlot){
+  const g=GA();
+  // Use targetSlot for dimensions, but export all layers composited
+  const s=targetSlot||S();
+  const dims=getOutDims(s);
+  const ec=document.getElementById('export-canvas');
   ec.width=dims.w;ec.height=dims.h;const ctx=ec.getContext('2d');
   ctx.clearRect(0,0,dims.w,dims.h);
   if(expFmt!=='png'){ctx.fillStyle='#fff';ctx.fillRect(0,0,dims.w,dims.h)}
-  ctx.save();ctx.globalAlpha=s.opacity/100;ctx.translate(dims.w/2,dims.h/2);
-  if(s.rotate)ctx.rotate(s.rotate*Math.PI/180);
-  ctx.scale(s.mirrorH?-1:1,s.mirrorV?-1:1);
-  ctx.filter=`brightness(${g.brightness}%) contrast(${g.contrast}%) saturate(${g.saturation}%) hue-rotate(${g.hue}deg)`;
-  ctx.drawImage(s.img,-dims.w/2,-dims.h/2,dims.w,dims.h);ctx.restore();
+  // Draw all visible layers in order
+  const visLayers=layerOrder.filter(i=>slots[i].img);
+  visLayers.forEach(slotIdx=>{
+    const sl=slots[slotIdx];
+    ctx.save();ctx.globalAlpha=sl.opacity/100;
+    ctx.globalCompositeOperation=sl.blend||'source-over';
+    ctx.translate(dims.w/2,dims.h/2);
+    if(sl.rotate)ctx.rotate(sl.rotate*Math.PI/180);
+    ctx.scale(sl.mirrorH?-1:1,sl.mirrorV?-1:1);
+    ctx.filter=`brightness(${g.brightness}%) contrast(${g.contrast}%) saturate(${g.saturation}%) hue-rotate(${g.hue}deg)`;
+    ctx.drawImage(sl.img,-dims.w/2,-dims.h/2,dims.w,dims.h);
+    ctx.restore();
+  });
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.filter='none';
   if(g.bgRemove)applyBg(ec,g.bgTol,g.bgTarget);
   if(g.htOn)applyHT(ec,g.htSize*(dims.w/500),g.htSpacing*(dims.w/500),g.htAngle,g.htColor,g.htMode);
   if(g.wmOn)drawWM(ctx,g,dims.w,dims.h);
-  s.texts.forEach(t=>{ctx.save();ctx.font=`${t.bold?'bold ':''}${Math.round(t.size*(dims.w/500))}px ${t.font}`;ctx.fillStyle=t.color;ctx.textAlign='center';ctx.textBaseline='middle';const x=(t.x/100)*dims.w,y=(t.y/100)*dims.h;if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size*(dims.w/500)/10;ctx.strokeText(t.content,x,y)}ctx.fillText(t.content,x,y);ctx.restore()});
+  s.texts&&s.texts.forEach(t=>{ctx.save();ctx.font=`${t.bold?'bold ':''}${Math.round(t.size*(dims.w/500))}px ${t.font}`;ctx.fillStyle=t.color;ctx.textAlign='center';ctx.textBaseline='middle';const x=(t.x/100)*dims.w,y=(t.y/100)*dims.h;if(t.stroke){ctx.strokeStyle=t.strokeColor;ctx.lineWidth=t.size*(dims.w/500)/10;ctx.strokeText(t.content,x,y)}ctx.fillText(t.content,x,y);ctx.restore()});
   const mime=expFmt==='png'?'image/png':expFmt==='jpg'?'image/jpeg':'image/webp';
   return new Promise(res=>ec.toBlob(b=>res({url:URL.createObjectURL(b),kb:Math.round(b.size/1024),w:dims.w,h:dims.h}),mime,expFmt==='png'?undefined:.95));
 }
 
 async function doExport(){
-  if(!S().img)return;const out=document.getElementById('output-area');
-  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Procesando...</div>`;
+  const visLayers=layerOrder.filter(i=>slots[i].img);
+  if(!visLayers.length)return;
+  const out=document.getElementById('output-area');
+  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Procesando ${visLayers.length} capa(s)...</div>`;
   await new Promise(r=>setTimeout(r,50));
   const res=await exportSlot(S());
-  out.innerHTML=`<div class="output-card"><h4>✅ ${LABELS[activeSlot]} lista</h4><code>${res.w}x${res.h}px · ${res.kb} KB · .${expFmt.toUpperCase()}</code><a class="dl-btn" href="${res.url}" download="dtf_${LABELS[activeSlot].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a></div>`;
+  out.innerHTML=`<div class="output-card"><h4>✅ ${visLayers.length} capa(s) combinadas</h4><code>${res.w}x${res.h}px · ${res.kb} KB · .${expFmt.toUpperCase()}</code><a class="dl-btn" href="${res.url}" download="dtf_composited.${expFmt}">⬇ DESCARGAR</a></div>`;
 }
 
 async function batchExport(){
-  const active=slots.filter(s=>s.img),out=document.getElementById('output-area');
-  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Exportando ${active.length} imágenes...</div>`;
+  const visLayers=layerOrder.filter(i=>slots[i].img);
+  if(!visLayers.length)return;
+  const out=document.getElementById('output-area');
+  out.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px"><span class="spin"></span> Exportando composición...</div>`;
   await new Promise(r=>setTimeout(r,50));
-  let html='<div style="margin-top:12px">';
-  for(const s of active){const res=await exportSlot(s);html+=`<div class="output-card"><h4 style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:${COLORS[s.id]};display:inline-block"></span>✅ ${LABELS[s.id]}</h4><code>${res.w}x${res.h}px · ${res.kb} KB</code><a class="dl-btn" href="${res.url}" download="dtf_${LABELS[s.id].replace(' ','_')}.${expFmt}">⬇ DESCARGAR</a></div>`}
-  out.innerHTML=html+'</div>';
+  const res=await exportSlot(S());
+  let html=`<div style="margin-top:12px"><div class="output-card"><h4>✅ Composición: ${visLayers.length} capas</h4><code>${res.w}x${res.h}px · ${res.kb} KB · .${expFmt.toUpperCase()}</code><a class="dl-btn" href="${res.url}" download="dtf_composited.${expFmt}">⬇ DESCARGAR COMPOSICIÓN</a></div>`;
+  html+='</div>';
+  out.innerHTML=html;
 }
 
 function refresh(){renderSlotsBar();renderPreview();renderToolPanel();document.getElementById('mh-btn')?.classList.toggle('on',S().mirrorH);document.getElementById('mv-btn')?.classList.toggle('on',S().mirrorV);saveAll()}
